@@ -17,7 +17,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 const auth = require('./auth')
-const multer = require('multer')
+// const multer = require('multer')
 const Message = require('./messageModel')
 const bcrypt = require('bcrypt')
 const http = require('http');
@@ -145,14 +145,14 @@ app.post("/verify-email-otp", async (req, res) => {
 // login
 
 app.post("/login", async (req, res) => {
-    const { identifier, password } = req.body;
+    const { loginId, password } = req.body;
 
     try {
          const user = await User.findOne({
       $or: [
-        { email: identifier },
-        { username: identifier },
-        { mobile: identifier },
+        { email: loginId },
+        { username: loginId },
+        { mobile: loginId },
       ],
     });
         if (!user) return res.status(404).send({ message: "User not found" });
@@ -178,57 +178,48 @@ app.post("/login", async (req, res) => {
 });
 
 // Multer setup
-const fs = require('fs');
-const uploadDir = 'uploads/profile_pics';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// middleware/upload.js
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("./cloudinaryconfig");
 
-const storage2 = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
+const profilePicStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "profile_pics",
+    allowed_formats: ["jpg", "jpeg", "png"],
+    transformation: [{ width: 300, height: 300, crop: "limit" }],
   },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    cb(null, filename);
-  }
 });
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png/;
-  const isValidExt = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const isValidMime = allowedTypes.test(file.mimetype);
-  if (isValidExt && isValidMime) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only images (jpeg, jpg, png) are allowed'));
-  }
-};
 
-const uploads2 = multer({ storage: storage2, fileFilter });
+
+const uploadProfilePic = multer({ storage: profilePicStorage });
+
+
+
+
 
 
 // Profile pic upload route
-app.post('/user/profile-pic', auth, uploads2.single('profilePic'), async (req, res) => {
+app.post('/user/profile-pic', auth, uploadProfilePic.single('profilePic'), async (req, res) => {
   try {
-    console.log('req.file:', req.file);
-    if (!req.file) {
+    if (!req.file || !req.file.path) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
     const userId = req.user._id;
-    const profilePicPath = `/uploads/profile_pics/${req.file.filename}`;
-
+    const profilePicUrl = req.file.path; // Cloudinary URL
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { profilePic: profilePicPath },
+      { profilePic: profilePicUrl },
       { new: true }
     );
 
     res.status(200).json({
       message: 'Profile picture updated',
+      profilePic: profilePicUrl,
       user: updatedUser
     });
   } catch (err) {
@@ -286,19 +277,43 @@ app.post("/reset-password", async (req, res) => {
     }
 });
 
+// upload.js (or uploads.js)
+// const multer = require('multer');
+// const { CloudinaryStorage } = require('multer-storage-cloudinary');
+// const cloudinary = require('./cloudinaryconfig');
+// const path = require('path');
 
-const storage = multer.diskStorage({
-  destination: 'uploads/',
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    let folder = 'posts';
+
+    if (file.fieldname === 'backgroundMusic') folder = 'music';
+
+    return {
+      folder,
+      resource_type: 'auto', // Auto-detect image/audio/video
+      public_id: `${Date.now()}-${file.originalname.split('.')[0]}`,
+    };
+  },
 });
 
 const upload = multer({ storage });
 
+
+
+
+
 // Post Creation Endpoint
-app.post("/create-post",auth,upload.fields([{ name: "image", maxCount: 1 },{ name: "backgroundMusic", maxCount: 1 }]),
-async (req, res) => {
+app.post(
+  "/create-post",
+  auth,
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "backgroundMusic", maxCount: 1 }
+  ]),
+  async (req, res) => {
     try {
       const { caption, mediaType } = req.body;
 
@@ -312,13 +327,14 @@ async (req, res) => {
       const post = await Post.create({
         caption,
         mediaType,
-        mediaUrl: imageFile.path,
-        backgroundMusic: mediaType === "image" && musicFile ? musicFile.path : null,
+        mediaUrl: imageFile.path, // Cloudinary URL
+        backgroundMusic: mediaType === "image" && musicFile ? musicFile.path : null, // Cloudinary URL
         postedBy: req.user.id
       });
 
       res.status(201).json({ post });
     } catch (err) {
+      console.error(err);
       res.status(500).json({ error: err.message });
     }
   }
@@ -428,6 +444,16 @@ app.get("/follow-status/:targetUserId", auth, async (req, res) => {
 });
 
 // NUMBER OF POSTS LIKES FOLLOWERS COUNTS ENDPOINT
+
+app.delete("/delete-post/:id",auth,async (req,res)=>{
+  const {id} = req.params;
+  console.log(id)
+
+  const post = await Post.findByIdAndDelete(id)
+  if(post){
+    res.status(200).json({message:"Post deleted Successfully"},post)
+  }
+})
 
 app.get('/users/:id/stats',auth, async (req, res) => {
     try {
