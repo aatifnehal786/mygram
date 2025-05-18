@@ -207,6 +207,7 @@ app.post('/user/profile-pic', auth, uploadProfilePic.single('profilePic'), async
     if (!req.file || !req.file.path) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
+    console.log("Authenticated user:", req.user);
 
     const userId = req.user._id;
     const profilePicUrl = req.file.path; // Cloudinary URL
