@@ -19,7 +19,7 @@ app.use(express.json());
 const auth = require('./auth')
 // const multer = require('multer')
 const Message = require('./messageModel')
-const bcrypt = require('bcrypt')
+const bcrypt = require('bcryptjs');
 const http = require('http');
 const socketIO = require('socket.io');
 const jwt = require('jsonwebtoken')
