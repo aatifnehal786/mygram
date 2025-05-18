@@ -145,10 +145,16 @@ app.post("/verify-email-otp", async (req, res) => {
 // login
 
 app.post("/login", async (req, res) => {
-    const { email, password } = req.body;
+    const { identifier, password } = req.body;
 
     try {
-        const user = await User.findOne({ email });
+         const user = await User.findOne({
+      $or: [
+        { email: identifier },
+        { username: identifier },
+        { mobile: identifier },
+      ],
+    });
         if (!user) return res.status(404).send({ message: "User not found" });
         if (!user.isEmailVerified) {
             return res.status(403).json({ message: "Email not verified. Please verify your email to login." });
