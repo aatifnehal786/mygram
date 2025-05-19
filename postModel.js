@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const users = require('./userModel'); // 👈 this ensures 'User' model is registered before use
+require('./userModel'); // just ensures it's registered
 
 const postSchema = new mongoose.Schema({
   caption: String,
@@ -14,4 +14,4 @@ const postSchema = new mongoose.Schema({
   }],
 }, { timestamps: true });
 
-module.exports = mongoose.model('Posts', postSchema);
+module.exports = mongoose.model('Post', postSchema); // singular name 'Post'

@@ -496,6 +496,19 @@ app.get("/allusers", auth, async (req, res) => {
   }
 });
 
+app.get("/allPosts", async (req, res) => {
+  try {
+    const allPosts = await Post.find()
+    
+    
+    res.status(200).json(allPosts);
+  } catch (err) {
+    console.error("Error fetching posts:", err);
+    res.status(500).json({ error: "Failed to fetch posts" });
+  }
+});
+
+
 // Socket setup
 
 const server = http.createServer(app);
