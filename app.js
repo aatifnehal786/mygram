@@ -25,7 +25,12 @@ const socketIO = require('socket.io');
 const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 4000;
 // Serve uploaded images statically
-app.use('/uploads', express.static('uploads'));
+// app.use('/uploads', express.static('uploads'));
+app.use(cors({
+  origin: "http://localhost:5173", // Update with your frontend URL
+  credentials: true,
+  exposedHeaders: ['Authorization']
+}));
 
 mongoose.connect(process.env.MONGO_URL)
     .then(() => console.log(`Database connection successful, ${process.env.MONGO_URL}`))
