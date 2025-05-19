@@ -27,9 +27,9 @@ const port = process.env.PORT || 4000;
 // Serve uploaded images statically
 // app.use('/uploads', express.static('uploads'));
 app.use(cors({
-  origin: "http://localhost:5173", // Update with your frontend URL
+  origin: "*", // use "*" for testing
   credentials: true,
-  exposedHeaders: ['Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 mongoose.connect(process.env.MONGO_URL)
