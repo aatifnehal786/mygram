@@ -18,8 +18,8 @@ const userSchema =  mongoose.Schema({
       profilePic: {
         type: String
       },
-      followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Users' }],
-      following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Users' }],
+      followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }],
+      following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }],
       
     password: { type: String, required: true },
     isEmailVerified: {type: Boolean, default: false}
@@ -27,4 +27,4 @@ const userSchema =  mongoose.Schema({
 
 
 
-module.exports = mongoose.model('Users', userSchema);
+module.exports = mongoose.model('users', userSchema);

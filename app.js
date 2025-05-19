@@ -26,7 +26,11 @@ const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 4000;
 // Serve uploaded images statically
 // app.use('/uploads', express.static('uploads'));
-
+app.use(cors({
+  origin: "*", // use "*" for testing
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 
 mongoose.connect(process.env.MONGO_URL)
     .then(() => console.log(`Database connection successful, ${process.env.MONGO_URL}`))
