@@ -85,7 +85,7 @@ app.post("/verify-otp", async (req, res) => {
 
   try {
     const verificationCheck = await client.verify.v2.services(process.env.TWILIO_VERIFY_SID)
-      .verificationChecks.create({ to: `+91${mobile}`, otp });
+      .verificationChecks.create({ to: `+91${mobile}`, code:otp });
 
     if (verificationCheck.status === 'approved') {
       res.json({ message: 'OTP verified successfully' });
