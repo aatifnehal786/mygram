@@ -4,10 +4,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const twilio = require('twilio');
-const client = twilio(
-  process.env.TWILIO_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 const User = require('./userModel')
 const Post = require('./postModel')
 // dotenv.config();
@@ -26,6 +23,9 @@ const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 4000;
 // Serve uploaded images statically
 // app.use('/uploads', express.static('uploads'));
+console.log("SID:", process.env.TWILIO_SID);
+console.log("AUTH:", process.env.TWILIO_AUTH_TOKEN);
+console.log("VERIFY:", process.env.TWILIO_VERIFY_SID);
 
 
 mongoose.connect(process.env.MONGO_URL)
@@ -66,24 +66,23 @@ app.post("/signup",async (req,res)=>{
  
 // send-otp endpoint
 
-app.post("/send-otp", async (req,res)=>{
+app.post("/send-otp", async (req, res) => {
+  const { mobile } = req.body;
 
-    const { mobile } = req.body;
   try {
     const verification = await client.verify.v2.services(process.env.TWILIO_VERIFY_SID)
       .verifications.create({ to: `+91${mobile}`, channel: 'sms' });
 
     res.json({ message: 'OTP sent', status: verification.status });
   } catch (err) {
+    console.error("OTP Send Error:", err.message); // log error for debugging
     res.status(500).json({ error: err.message });
   }
-})
+});
 
-// verify-otp endpoint
+app.post("/verify-otp", async (req, res) => {
+  const { mobile, code } = req.body;
 
-app.post("/verify-otp", async (req,res)=>{
-
-    const { mobile, code } = req.body;
   try {
     const verificationCheck = await client.verify.v2.services(process.env.TWILIO_VERIFY_SID)
       .verificationChecks.create({ to: `+91${mobile}`, code });
@@ -94,9 +93,11 @@ app.post("/verify-otp", async (req,res)=>{
       res.status(400).json({ error: 'Invalid or expired OTP' });
     }
   } catch (err) {
+    console.error("OTP Verify Error:", err.message); // log error for debugging
     res.status(500).json({ error: err.message });
   }
-})
+});
+
 
 // Send OTP
 app.post("/send-email-otp", async (req, res) => {
