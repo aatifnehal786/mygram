@@ -526,26 +526,63 @@ io.on('connection', (socket) => {
     io.emit('onlineUsers', Array.from(onlineUsers.keys()));
   });
 
+// socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
+//   try {
+//     const sender = await User.findById(senderId);
+//     const receiver = await User.findById(receiverId);
+    
+
+//     const senderFollowsReceiver = sender.following.includes(receiverId);
+//     const receiverFollowsSender = receiver.following.includes(senderId);
+
+//     if (!senderFollowsReceiver || !receiverFollowsSender) {
+//       return; // Block the message from being saved or sent
+//     }
+
+//     const newMsg = await Message.create({ sender: senderId, receiver: receiverId, message });
+
+//     const receiverSocket = onlineUsers.get(receiverId);
+//     if (receiverSocket) {
+//       io.to(receiverSocket).emit('receiveMessage', newMsg);
+//     }
+
+//     io.to(socket.id).emit('receiveMessage', newMsg); // Optional: send to sender
+//   } catch (err) {
+//     console.error("Error in sendMessage:", err);
+//   }
+// });
+
 socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
   try {
     const sender = await User.findById(senderId);
     const receiver = await User.findById(receiverId);
 
-    const senderFollowsReceiver = sender.following.map(id => id.toString()).includes(receiverId.toString());
-    const receiverFollowsSender = receiver.following.map(id => id.toString()).includes(senderId.toString());
+    if (!sender || !receiver) return;
+
+    // Use .some and .equals for ObjectId comparisons
+    const senderFollowsReceiver = sender.following.some(id => id.equals(receiverId));
+    const receiverFollowsSender = receiver.following.some(id => id.equals(senderId));
 
     if (!senderFollowsReceiver || !receiverFollowsSender) {
-      return; // Block the message from being saved or sent
+      console.log('Message blocked: users are not mutually following.');
+      return; // Block the message
     }
 
-    const newMsg = await Message.create({ sender: senderId, receiver: receiverId, message });
+    const newMsg = await Message.create({
+      sender: senderId,
+      receiver: receiverId,
+      message,
+    });
 
+    // Send to receiver if online
     const receiverSocket = onlineUsers.get(receiverId);
     if (receiverSocket) {
       io.to(receiverSocket).emit('receiveMessage', newMsg);
     }
 
-    io.to(socket.id).emit('receiveMessage', newMsg); // Optional: echo back to sender
+    // Echo back to sender
+    io.to(socket.id).emit('receiveMessage', newMsg);
+
   } catch (err) {
     console.error("Error in sendMessage:", err);
   }
@@ -565,30 +602,35 @@ socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
 // chat endpoint 
 
 app.get("/chat/:userId", auth, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const targetId = req.params.userId;
+ try {
+    const senderId = req.user.id; // logged-in user
+    const receiverId = req.params.userId;
 
-    const user = await User.findById(userId);
-    const targetUser = await User.findById(targetId);
+    const sender = await User.findById(senderId);
+    const receiver = await User.findById(receiverId);
 
-    const userFollowsTarget = user.following.includes(targetId);
-    const targetFollowsUser = targetUser.following.includes(userId);
-
-    if (!userFollowsTarget || !targetFollowsUser) {
-      return res.status(403).json({ error: "You must follow each other to chat." });
+    if (!sender || !receiver) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    const messages = await Message.find({
+    const senderFollowsReceiver = sender.following.some(id => id.equals(receiverId));
+    const receiverFollowsSender = receiver.following.some(id => id.equals(senderId));
+
+    if (!senderFollowsReceiver || !receiverFollowsSender) {
+      return res.status(403).json({ message: 'Users must follow each other to chat' });
+    }
+
+    const messages = await Chat.find({
       $or: [
-        { sender: userId, receiver: targetId },
-        { sender: targetId, receiver: userId }
+        { sender: senderId, receiver: receiverId },
+        { sender: receiverId, receiver: senderId }
       ]
-    }).sort('createdAt');
+    }).sort({ createdAt: 1 });
 
     res.json(messages);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Fetch chat error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
