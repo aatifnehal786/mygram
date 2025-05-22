@@ -604,7 +604,7 @@ socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
 app.get("/chat/:userId", auth, async (req, res) => {
  try {
     const currentUserId = req.user.id;
-    const targetUserId = req.params.targetUserId;
+    const targetUserId = req.params.userId;
 
     const sender = await User.findById(currentUserId);
     const receiver = await User.findById(targetUserId);
