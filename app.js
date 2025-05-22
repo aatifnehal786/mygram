@@ -531,8 +531,8 @@ socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
     const sender = await User.findById(senderId);
     const receiver = await User.findById(receiverId);
 
-    const senderFollowsReceiver = sender.following.includes(receiverId);
-    const receiverFollowsSender = receiver.following.includes(senderId);
+    const senderFollowsReceiver = sender.following.map(id => id.toString()).includes(receiverId.toString());
+    const receiverFollowsSender = receiver.following.map(id => id.toString()).includes(senderId.toString());
 
     if (!senderFollowsReceiver || !receiverFollowsSender) {
       return; // Block the message from being saved or sent
@@ -545,11 +545,12 @@ socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
       io.to(receiverSocket).emit('receiveMessage', newMsg);
     }
 
-    io.to(socket.id).emit('receiveMessage', newMsg); // Optional: send to sender
+    io.to(socket.id).emit('receiveMessage', newMsg); // Optional: echo back to sender
   } catch (err) {
     console.error("Error in sendMessage:", err);
   }
 });
+
 
 
   socket.on('disconnect', () => {
