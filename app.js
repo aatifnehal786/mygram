@@ -603,38 +603,38 @@ socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
 
 app.get("/chat/:userId", auth, async (req, res) => {
  try {
-    const senderId = req.user.id; // logged-in user
-    const receiverId = req.params.userId;
+    const currentUserId = req.user.id;
+    const targetUserId = req.params.targetUserId;
 
-    const sender = await User.findById(senderId);
-    const receiver = await User.findById(receiverId);
+    const sender = await User.findById(currentUserId);
+    const receiver = await User.findById(targetUserId);
 
     if (!sender || !receiver) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    const senderFollowsReceiver = sender.following.some(id => id.equals(receiverId));
-    const receiverFollowsSender = receiver.following.some(id => id.equals(senderId));
+    const senderFollowsReceiver = sender.following.some(id => id.toString() === targetUserId);
+    const receiverFollowsSender = receiver.following.some(id => id.toString() === currentUserId);
 
     if (!senderFollowsReceiver || !receiverFollowsSender) {
-      return res.status(403).json({ message: 'Users must follow each other to chat' });
+      return res.status(403).json({ error: 'You can only chat with users who follow each other.' });
     }
 
-    const messages = await Chat.find({
+    const messages = await Message.find({
       $or: [
-        { sender: senderId, receiver: receiverId },
-        { sender: receiverId, receiver: senderId }
+        { sender: currentUserId, receiver: targetUserId },
+        { sender: targetUserId, receiver: currentUserId }
       ]
     }).sort({ createdAt: 1 });
 
-    res.json(messages);
+    return res.status(200).json(messages);
   } catch (err) {
-    console.error('Fetch chat error:', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error in /chat/:targetUserId:', err);
+    return res.status(500).json({ error: 'Server error' });
   }
 });
 
 
-app.listen(port, () => {
+server.listen(port, () => {
     console.log(`Server is up and running on port ${port}`);
 });
