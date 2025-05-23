@@ -590,11 +590,14 @@ io.on('connection', (socket) => {
 
    
 
-      const newMsg = await Message.create({
-        sender: senderId,
-        receiver: receiverId,
-        message,
-      });
+    const newMsg = await Message.create({
+  sender: senderId,
+  receiver: receiverId,
+  message: message || '', // fallback empty string if undefined
+  fileUrl: fileUrl,       // optional, if file sent
+  fileType: fileType      // optional
+});
+
 
       const sendToUserSockets = (userId, msg) => {
         const sockets = onlineUsers.get(userId);
