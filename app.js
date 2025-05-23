@@ -168,7 +168,7 @@ app.post("/login", async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(401).json({ message: "Incorrect password" });
 
-        const token = jwt.sign({ email: user.email, id: user._id }, process.env.JWT_SECRET_KEY, { expiresIn: "1h" });
+        const token = jwt.sign({ email: user.email, id: user._id }, process.env.JWT_SECRET_KEY);
 
         res.status(200).send({
             token,
