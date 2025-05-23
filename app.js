@@ -592,7 +592,7 @@ io.on('connection', (socket) => {
       sender: senderId,
       receiver: receiverId,
       message: message || '', // ensure fallback
-      file: fileUrl || null,  // make sure these fields exist in your Message schema
+      fileUrl: fileUrl || null,  // make sure these fields exist in your Message schema
       fileType: fileType || null
     });
 
