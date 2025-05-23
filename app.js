@@ -638,17 +638,24 @@ io.on('connection', (socket) => {
 
 
   // Cleanup on disconnect
-  socket.on('disconnect', () => {
-    for (let [userId, socketSet] of onlineUsers.entries()) {
-      socketSet.delete(socket.id);
-      if (socketSet.size === 0) {
-        onlineUsers.delete(userId);
+ socket.on('disconnect', async () => {
+  for (let [userId, socketSet] of onlineUsers.entries()) {
+    socketSet.delete(socket.id);
+    if (socketSet.size === 0) {
+      onlineUsers.delete(userId);
+
+      // Update last seen
+      try {
+        await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
+      } catch (err) {
+        console.error('Failed to update last seen:', err);
       }
     }
-    io.emit('onlineUsers', Array.from(onlineUsers.keys()));
-    console.log('Socket disconnected:', socket.id);
-  });
+  }
+  io.emit('onlineUsers', Array.from(onlineUsers.keys()));
+  console.log('Socket disconnected:', socket.id);
 });
+})
 
 // module.exports = server;
 
