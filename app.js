@@ -581,38 +581,36 @@ io.on('connection', (socket) => {
   });
 
   // Send a message
-  socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
-    try {
-      const sender = await User.findById(senderId);
-      const receiver = await User.findById(receiverId);
+ socket.on('sendMessage', async ({ senderId, receiverId, message, fileUrl, fileType }) => {
+  try {
+    const sender = await User.findById(senderId);
+    const receiver = await User.findById(receiverId);
 
-      if (!sender || !receiver) return;
-
-   
+    if (!sender || !receiver) return;
 
     const newMsg = await Message.create({
-  sender: senderId,
-  receiver: receiverId,
-  message: message, // fallback empty string if undefined
-  fileUrl: fileUrl,       // optional, if file sent
-  fileType: fileType      // optional
+      sender: senderId,
+      receiver: receiverId,
+      message: message || '', // ensure fallback
+      file: fileUrl || null,  // make sure these fields exist in your Message schema
+      fileType: fileType || null
+    });
+
+    const sendToUserSockets = (userId, msg) => {
+      const sockets = onlineUsers.get(userId);
+      if (sockets) {
+        sockets.forEach(sockId => io.to(sockId).emit('receiveMessage', msg));
+      }
+    };
+
+    sendToUserSockets(senderId, newMsg);   // Send to all tabs/devices of sender
+    sendToUserSockets(receiverId, newMsg); // Send to all tabs/devices of receiver
+
+  } catch (err) {
+    console.error("Error in sendMessage:", err);
+  }
 });
 
-
-      const sendToUserSockets = (userId, msg) => {
-        const sockets = onlineUsers.get(userId);
-        if (sockets) {
-          sockets.forEach(sockId => io.to(sockId).emit('receiveMessage', msg));
-        }
-      };
-
-      sendToUserSockets(senderId, newMsg);   // Send to all tabs/devices of sender
-      sendToUserSockets(receiverId, newMsg); // Send to all tabs/devices of receiver
-
-    } catch (err) {
-      console.error("Error in sendMessage:", err);
-    }
-  });
 
   // Cleanup on disconnect
   socket.on('disconnect', () => {
