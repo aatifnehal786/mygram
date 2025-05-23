@@ -54,6 +54,7 @@ app.post("/signup",async (req,res)=>{
     let { username, email, password, mobile } = req.body;
     const olduser = await User.findOne({ email: email });
     if (olduser) return res.status(403).send({ message: "User already registered" });
+    
 
     try {
         const salt = await bcrypt.genSalt(10);
@@ -412,13 +413,22 @@ app.put("/follow/:targetUserId", auth, async (req, res) => {
     return res.status(400).json({ error: "Missing userId to follow." });
   }
 
-  await User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } });
+ try {
+   await User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } });
   await User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } });
 
   res.json({ message: "Followed" });
+  
+ } catch (error) {
+
+   console.error("follow error:", err);
+    res.status(500).json({ error: "Server error during follow." });
+  
+ }
+
+  
 });
 // UNFOLLOW
-
 app.put("/unfollow/:targetUserId", auth, async (req, res) => {
   const currentUserId = req.user._id;
   const { targetUserId } = req.params;
@@ -427,11 +437,21 @@ app.put("/unfollow/:targetUserId", auth, async (req, res) => {
     return res.status(400).json({ error: "Missing userId to unfollow." });
   }
 
-  await User.findByIdAndUpdate(currentUserId, { $pull: { following: targetUserId } });
-  await User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } });
+  try {
+    await User.findByIdAndUpdate(currentUserId, {
+      $pull: { following: mongoose.Types.ObjectId(targetUserId) }
+    });
+    await User.findByIdAndUpdate(targetUserId, {
+      $pull: { followers: mongoose.Types.ObjectId(currentUserId) }
+    });
 
-  res.json({ message: "Unfollowed" });
+    res.json({ message: "Unfollowed" });
+  } catch (err) {
+    console.error("Unfollow error:", err);
+    res.status(500).json({ error: "Server error during unfollow." });
+  }
 });
+
 // Get follow status
 app.get("/follow-status/:targetUserId", auth, async (req, res) => {
   const currentUserId = req.user._id;
