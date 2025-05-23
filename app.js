@@ -429,6 +429,8 @@ app.put("/follow/:targetUserId", auth, async (req, res) => {
   
 });
 // UNFOLLOW
+const mongoose = require("mongoose");
+
 app.put("/unfollow/:targetUserId", auth, async (req, res) => {
   const currentUserId = req.user._id;
   const { targetUserId } = req.params;
@@ -439,10 +441,11 @@ app.put("/unfollow/:targetUserId", auth, async (req, res) => {
 
   try {
     await User.findByIdAndUpdate(currentUserId, {
-      $pull: { following: mongoose.Types.ObjectId(targetUserId) }
+      $pull: { following: mongoose.Types.ObjectId(targetUserId) } // ✅ no "new"
     });
+
     await User.findByIdAndUpdate(targetUserId, {
-      $pull: { followers: mongoose.Types.ObjectId(currentUserId) }
+      $pull: { followers: mongoose.Types.ObjectId(currentUserId) } // ✅ no "new"
     });
 
     res.json({ message: "Unfollowed" });
@@ -451,6 +454,7 @@ app.put("/unfollow/:targetUserId", auth, async (req, res) => {
     res.status(500).json({ error: "Server error during unfollow." });
   }
 });
+
 
 // Get follow status
 app.get("/follow-status/:targetUserId", auth, async (req, res) => {
