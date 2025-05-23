@@ -549,31 +549,7 @@ app.post('/upload/chat', upload3.single('file'), async (req, res) => {
   }
 });
 
- // Import User model
 
-socket.on('disconnect', async () => {
-  console.log('Socket disconnected:', socket.id);
-
-  for (let [userId, socketSet] of onlineUsers.entries()) {
-    socketSet.delete(socket.id);
-    
-    // If no more sockets for this user, mark as offline
-    if (socketSet.size === 0) {
-      onlineUsers.delete(userId);
-
-      // ⏱️ Update last seen in DB
-      try {
-        await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
-        console.log(`Updated last seen for user ${userId}`);
-      } catch (err) {
-        console.error('Error updating lastSeen:', err);
-      }
-    }
-  }
-
-  // Notify clients about updated online users
-  io.emit('onlineUsers', Array.from(onlineUsers.keys()));
-});
 
 // Socket setup
 
@@ -581,21 +557,19 @@ socket.on('disconnect', async () => {
 
 
 const server = createServer(app);
-
-const io = new Server(server,{
-    cors:{
-        origin:"http://localhost:5173",
-        methods: ["GET","POST","PUT","DELETE"],
-        credentials: true,
-    }
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  }
 });
 
-// Allow multiple sockets per user
 let onlineUsers = new Map(); // userId => Set of socket IDs
+
 io.on('connection', (socket) => {
   console.log('New socket connection:', socket.id);
 
-  // User joins: register socket under their userId
   socket.on('join', (userId) => {
     if (!onlineUsers.has(userId)) {
       onlineUsers.set(userId, new Set());
@@ -604,7 +578,6 @@ io.on('connection', (socket) => {
     io.emit('onlineUsers', Array.from(onlineUsers.keys()));
   });
 
-  // Sending message
   socket.on('sendMessage', async ({ senderId, receiverId, message, fileUrl, fileType }) => {
     try {
       const sender = await User.findById(senderId);
@@ -626,21 +599,19 @@ io.on('connection', (socket) => {
         }
       };
 
-      sendToUserSockets(senderId, newMsg);   // Notify sender
-      sendToUserSockets(receiverId, newMsg); // Notify receiver
+      sendToUserSockets(senderId, newMsg);
+      sendToUserSockets(receiverId, newMsg);
     } catch (err) {
       console.error("Error in sendMessage:", err);
     }
   });
 
-  // Handle disconnect
+  // ✅ Must be inside io.on('connection', socket => { ... })
   socket.on('disconnect', async () => {
     for (let [userId, socketSet] of onlineUsers.entries()) {
       socketSet.delete(socket.id);
       if (socketSet.size === 0) {
         onlineUsers.delete(userId);
-
-        // 🕒 Update lastSeen in DB
         try {
           await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
         } catch (err) {
