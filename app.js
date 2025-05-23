@@ -518,20 +518,42 @@ app.get("/allPosts", async (req, res) => {
   }
 });
 
+// const cloudinary = require('../utils/cloudinary');
+// const multer = require('multer');
+const streamifier = require('streamifier');
+
+const upload3 = multer();
+
+app.post('/upload/chat', upload3.single('file'), async (req, res) => {
+  try {
+    const fileType = req.file.mimetype.split('/')[0]; // image, video, audio, etc.
+
+    const streamUpload = (req) =>
+      new Promise((resolve, reject) => {
+        let stream = cloudinary.uploader.upload_stream(
+          { resource_type: 'auto', folder: 'chat_files' },
+          (error, result) => {
+            if (result) resolve(result);
+            else reject(error);
+          }
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+
+    const result = await streamUpload(req);
+
+    res.json({ fileUrl: result.secure_url, fileType: req.file.mimetype });
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
 
 // Socket setup
 
 
-// const socketIO = require('socket.io');
 
-
-// const server = http.createServer(app);
-// const io = socketIO(server, {
-//   cors: {
-//     origin: '*',
-//     methods: ['GET', 'POST']
-//   }
-// });
 
 const server = createServer(app);
 
@@ -566,13 +588,7 @@ io.on('connection', (socket) => {
 
       if (!sender || !receiver) return;
 
-      const senderFollowsReceiver = sender.following.some(id => id.equals(receiverId));
-      const receiverFollowsSender = receiver.following.some(id => id.equals(senderId));
-
-      if (!senderFollowsReceiver || !receiverFollowsSender) {
-        console.log('Message blocked: users are not mutually following.');
-        return;
-      }
+   
 
       const newMsg = await Message.create({
         sender: senderId,
@@ -614,10 +630,11 @@ io.on('connection', (socket) => {
 // chat endpoint 
 
 app.get("/chat/:userId", auth, async (req, res) => {
- try {
+  try {
     const currentUserId = req.user.id;
     const targetUserId = req.params.userId;
 
+    // Check if both users exist
     const sender = await User.findById(currentUserId);
     const receiver = await User.findById(targetUserId);
 
@@ -625,13 +642,9 @@ app.get("/chat/:userId", auth, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const senderFollowsReceiver = sender.following.some(id => id.toString() === targetUserId);
-    const receiverFollowsSender = receiver.following.some(id => id.toString() === currentUserId);
+    // ❌ REMOVE mutual follower check
 
-    if (!senderFollowsReceiver || !receiverFollowsSender) {
-      return res.status(403).json({ error: 'You can only chat with users who follow each other.' });
-    }
-
+    // Get chat messages between the two users
     const messages = await Message.find({
       $or: [
         { sender: currentUserId, receiver: targetUserId },
@@ -645,6 +658,49 @@ app.get("/chat/:userId", auth, async (req, res) => {
     return res.status(500).json({ error: 'Server error' });
   }
 });
+
+app.get('/search-users', auth, async (req, res) => {
+  const query = req.query.q;
+
+  try {
+    const users = await User.find({
+      $or: [
+        { name: { $regex: query, $options: 'i' } },
+        { username: { $regex: query, $options: 'i' } }
+      ]
+    }).select('_id name username profilePic');
+
+    res.status(200).json(users);
+  } catch (err) {
+    console.error('User search failed:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+app.get('/chat-list', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const messages = await Message.find({
+      $or: [{ sender: userId }, { receiver: userId }]
+    }).populate('sender receiver', 'name username profilePic');
+
+    const uniqueUsers = new Map();
+
+    messages.forEach(msg => {
+      const partner = msg.sender._id.toString() === userId ? msg.receiver : msg.sender;
+      uniqueUsers.set(partner._id.toString(), partner);
+    });
+
+    res.status(200).json(Array.from(uniqueUsers.values()));
+  } catch (err) {
+    console.error('Chat list error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
 
 
 server.listen(port, () => {
