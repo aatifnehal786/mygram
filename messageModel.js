@@ -1,11 +1,13 @@
+// models/Message.js (or wherever your schema is)
 const mongoose = require('mongoose');
-require('./userModel'); 
 
-const messageSchema =  mongoose.Schema({
-  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'users' },
-  receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'users' },
-  message: { type: String, required: true },
+const MessageSchema = new mongoose.Schema({
+  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
+  receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
+  message: { type: String },   // removed `required: true`
+  fileUrl: { type: String },
+  fileType: { type: String },
   createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('messages', messageSchema);
+module.exports = mongoose.model('messages', MessageSchema);
