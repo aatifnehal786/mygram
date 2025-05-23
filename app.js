@@ -413,23 +413,12 @@ app.put("/follow/:targetUserId", auth, async (req, res) => {
     return res.status(400).json({ error: "Missing userId to follow." });
   }
 
- try {
-   await User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } });
+  await User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } });
   await User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } });
 
   res.json({ message: "Followed" });
-  
- } catch (error) {
-
-   console.error("follow error:", err);
-    res.status(500).json({ error: "Server error during follow." });
-  
- }
-
-  
 });
 // UNFOLLOW
-const mongoose = require("mongoose");
 
 app.put("/unfollow/:targetUserId", auth, async (req, res) => {
   const currentUserId = req.user._id;
@@ -439,23 +428,11 @@ app.put("/unfollow/:targetUserId", auth, async (req, res) => {
     return res.status(400).json({ error: "Missing userId to unfollow." });
   }
 
-  try {
-    await User.findByIdAndUpdate(currentUserId, {
-      $pull: { following: mongoose.Types.ObjectId(targetUserId) } // ✅ no "new"
-    });
+  await User.findByIdAndUpdate(currentUserId, { $pull: { following: targetUserId } });
+  await User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } });
 
-    await User.findByIdAndUpdate(targetUserId, {
-      $pull: { followers: mongoose.Types.ObjectId(currentUserId) } // ✅ no "new"
-    });
-
-    res.json({ message: "Unfollowed" });
-  } catch (err) {
-    console.error("Unfollow error:", err);
-    res.status(500).json({ error: "Server error during unfollow." });
-  }
+  res.json({ message: "Unfollowed" });
 });
-
-
 // Get follow status
 app.get("/follow-status/:targetUserId", auth, async (req, res) => {
   const currentUserId = req.user._id;
