@@ -17,8 +17,10 @@ const auth = require('./auth')
 // const multer = require('multer')
 const Message = require('./messageModel')
 const bcrypt = require('bcryptjs');
-const http = require('http');
-const socketIO = require('socket.io');
+// const http = require('http');
+// const socketIO = require('socket.io');
+const {Server} = require('socket.io');
+const {createServer} = require('http');
 const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 4000;
 // Serve uploaded images statically
@@ -518,96 +520,95 @@ app.get("/allPosts", async (req, res) => {
 
 // Socket setup
 
-const server = http.createServer(app);
-const io = socketIO(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+
+// const socketIO = require('socket.io');
+
+
+// const server = http.createServer(app);
+// const io = socketIO(server, {
+//   cors: {
+//     origin: '*',
+//     methods: ['GET', 'POST']
+//   }
+// });
+
+const server = createServer(app);
+
+const io = new Server(server,{
+    cors:{
+        origin:"http://localhost:5173",
+        methods: ["GET","POST"],
+        credentials: true,
+    }
 });
 
-let onlineUsers = new Map();
+// Allow multiple sockets per user
+let onlineUsers = new Map(); // userId => Set of socket IDs
 
 io.on('connection', (socket) => {
   console.log('New socket connection:', socket.id);
 
+  // Track socket under user ID
   socket.on('join', (userId) => {
-    onlineUsers.set(userId, socket.id);
+    if (!onlineUsers.has(userId)) {
+      onlineUsers.set(userId, new Set());
+    }
+    onlineUsers.get(userId).add(socket.id);
     io.emit('onlineUsers', Array.from(onlineUsers.keys()));
   });
 
-// socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
-//   try {
-//     const sender = await User.findById(senderId);
-//     const receiver = await User.findById(receiverId);
-    
+  // Send a message
+  socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
+    try {
+      const sender = await User.findById(senderId);
+      const receiver = await User.findById(receiverId);
 
-//     const senderFollowsReceiver = sender.following.includes(receiverId);
-//     const receiverFollowsSender = receiver.following.includes(senderId);
+      if (!sender || !receiver) return;
 
-//     if (!senderFollowsReceiver || !receiverFollowsSender) {
-//       return; // Block the message from being saved or sent
-//     }
+      const senderFollowsReceiver = sender.following.some(id => id.equals(receiverId));
+      const receiverFollowsSender = receiver.following.some(id => id.equals(senderId));
 
-//     const newMsg = await Message.create({ sender: senderId, receiver: receiverId, message });
+      if (!senderFollowsReceiver || !receiverFollowsSender) {
+        console.log('Message blocked: users are not mutually following.');
+        return;
+      }
 
-//     const receiverSocket = onlineUsers.get(receiverId);
-//     if (receiverSocket) {
-//       io.to(receiverSocket).emit('receiveMessage', newMsg);
-//     }
+      const newMsg = await Message.create({
+        sender: senderId,
+        receiver: receiverId,
+        message,
+      });
 
-//     io.to(socket.id).emit('receiveMessage', newMsg); // Optional: send to sender
-//   } catch (err) {
-//     console.error("Error in sendMessage:", err);
-//   }
-// });
+      const sendToUserSockets = (userId, msg) => {
+        const sockets = onlineUsers.get(userId);
+        if (sockets) {
+          sockets.forEach(sockId => io.to(sockId).emit('receiveMessage', msg));
+        }
+      };
 
-socket.on('sendMessage', async ({ senderId, receiverId, message }) => {
-  try {
-    const sender = await User.findById(senderId);
-    const receiver = await User.findById(receiverId);
+      sendToUserSockets(senderId, newMsg);   // Send to all tabs/devices of sender
+      sendToUserSockets(receiverId, newMsg); // Send to all tabs/devices of receiver
 
-    if (!sender || !receiver) return;
-
-    // Use .some and .equals for ObjectId comparisons
-    const senderFollowsReceiver = sender.following.some(id => id.equals(receiverId));
-    const receiverFollowsSender = receiver.following.some(id => id.equals(senderId));
-
-    if (!senderFollowsReceiver || !receiverFollowsSender) {
-      console.log('Message blocked: users are not mutually following.');
-      return; // Block the message
+    } catch (err) {
+      console.error("Error in sendMessage:", err);
     }
+  });
 
-    const newMsg = await Message.create({
-      sender: senderId,
-      receiver: receiverId,
-      message,
-    });
-
-    // Send to receiver if online
-    const receiverSocket = onlineUsers.get(receiverId);
-    if (receiverSocket) {
-      io.to(receiverSocket).emit('receiveMessage', newMsg);
-    }
-
-    // Echo back to sender
-    io.to(socket.id).emit('receiveMessage', newMsg);
-
-  } catch (err) {
-    console.error("Error in sendMessage:", err);
-  }
-});
-
-
-
+  // Cleanup on disconnect
   socket.on('disconnect', () => {
-    for (let [userId, sockId] of onlineUsers.entries()) {
-      if (sockId === socket.id) onlineUsers.delete(userId);
+    for (let [userId, socketSet] of onlineUsers.entries()) {
+      socketSet.delete(socket.id);
+      if (socketSet.size === 0) {
+        onlineUsers.delete(userId);
+      }
     }
     io.emit('onlineUsers', Array.from(onlineUsers.keys()));
     console.log('Socket disconnected:', socket.id);
   });
 });
+
+// module.exports = server;
+
 
 // chat endpoint 
 
