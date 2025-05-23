@@ -681,10 +681,13 @@ app.get('/search-users', auth, async (req, res) => {
 app.get('/chat-list', auth, async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log('Fetching chats for user:', userId);
 
     const messages = await Message.find({
       $or: [{ sender: userId }, { receiver: userId }]
     }).populate('sender receiver', 'name username profilePic');
+
+    console.log('Messages found:', messages.length);
 
     const uniqueUsers = new Map();
 
@@ -693,13 +696,15 @@ app.get('/chat-list', auth, async (req, res) => {
       uniqueUsers.set(partner._id.toString(), partner);
     });
 
-    res.status(200).json(Array.from(uniqueUsers.values()));
+    const usersArray = Array.from(uniqueUsers.values());
+    console.log('Unique chat partners:', usersArray.length);
+
+    res.status(200).json(usersArray);
   } catch (err) {
     console.error('Chat list error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 
 
 
