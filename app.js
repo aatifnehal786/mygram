@@ -695,8 +695,16 @@ app.get('/chat-list', auth, async (req, res) => {
     const uniqueUsers = new Map();
 
     messages.forEach(msg => {
-      const partner = msg.sender._id.toString() === userId ? msg.receiver : msg.sender;
-      uniqueUsers.set(partner._id.toString(), partner);
+      if (!msg.sender || !msg.receiver) return; // Skip if either is null
+
+      const partner =
+        msg.sender._id.toString() === userId
+          ? msg.receiver
+          : msg.sender;
+
+      if (partner && partner._id) {
+        uniqueUsers.set(partner._id.toString(), partner);
+      }
     });
 
     const usersArray = Array.from(uniqueUsers.values());
@@ -708,6 +716,7 @@ app.get('/chat-list', auth, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 
 
