@@ -549,6 +549,31 @@ app.post('/upload/chat', upload3.single('file'), async (req, res) => {
   }
 });
 
+ // Import User model
+
+socket.on('disconnect', async () => {
+  console.log('Socket disconnected:', socket.id);
+
+  for (let [userId, socketSet] of onlineUsers.entries()) {
+    socketSet.delete(socket.id);
+    
+    // If no more sockets for this user, mark as offline
+    if (socketSet.size === 0) {
+      onlineUsers.delete(userId);
+
+      // ⏱️ Update last seen in DB
+      try {
+        await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
+        console.log(`Updated last seen for user ${userId}`);
+      } catch (err) {
+        console.error('Error updating lastSeen:', err);
+      }
+    }
+  }
+
+  // Notify clients about updated online users
+  io.emit('onlineUsers', Array.from(onlineUsers.keys()));
+});
 
 // Socket setup
 
@@ -662,6 +687,7 @@ app.get("/chat/:userId", auth, async (req, res) => {
 
 app.get('/search-users', auth, async (req, res) => {
   const query = req.query.q;
+  const onlineUserIds = Array.from(onlineUsers.keys());
 
   try {
     const users = await User.find({
@@ -669,14 +695,25 @@ app.get('/search-users', auth, async (req, res) => {
         { name: { $regex: query, $options: 'i' } },
         { username: { $regex: query, $options: 'i' } }
       ]
-    }).select('_id name username profilePic');
+    }).select('_id name username profilePic lastSeen'); // add lastSeen here
 
-    res.status(200).json(users);
+    // Enhance users with isOnline field
+    const enhancedUsers = users.map(user => ({
+      _id: user._id,
+      name: user.name,
+      username: user.username,
+      profilePic: user.profilePic,
+      lastSeen: user.lastSeen,
+      isOnline: onlineUserIds.includes(user._id.toString())
+    }));
+
+    res.status(200).json(enhancedUsers);
   } catch (err) {
     console.error('User search failed:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 
 app.get('/chat-list', auth, async (req, res) => {
@@ -714,6 +751,7 @@ app.get('/chat-list', auth, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 
 

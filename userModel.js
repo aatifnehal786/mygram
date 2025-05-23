@@ -22,7 +22,12 @@ const userSchema =  mongoose.Schema({
       following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }],
       
     password: { type: String, required: true },
-    isEmailVerified: {type: Boolean, default: false}
+    isEmailVerified: {type: Boolean, default: false},
+    lastSeen: {
+  type: Date,
+  default: Date.now,
+}
+
 }, { timestamps: true });
 
 
