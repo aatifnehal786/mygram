@@ -592,11 +592,10 @@ const io = new Server(server,{
 
 // Allow multiple sockets per user
 let onlineUsers = new Map(); // userId => Set of socket IDs
-
 io.on('connection', (socket) => {
   console.log('New socket connection:', socket.id);
 
-  // Track socket under user ID
+  // User joins: register socket under their userId
   socket.on('join', (userId) => {
     if (!onlineUsers.has(userId)) {
       onlineUsers.set(userId, new Set());
@@ -605,57 +604,54 @@ io.on('connection', (socket) => {
     io.emit('onlineUsers', Array.from(onlineUsers.keys()));
   });
 
-  // Send a message
- socket.on('sendMessage', async ({ senderId, receiverId, message, fileUrl, fileType }) => {
-  try {
-    const sender = await User.findById(senderId);
-    const receiver = await User.findById(receiverId);
+  // Sending message
+  socket.on('sendMessage', async ({ senderId, receiverId, message, fileUrl, fileType }) => {
+    try {
+      const sender = await User.findById(senderId);
+      const receiver = await User.findById(receiverId);
+      if (!sender || !receiver) return;
 
-    if (!sender || !receiver) return;
+      const newMsg = await Message.create({
+        sender: senderId,
+        receiver: receiverId,
+        message: message || '',
+        fileUrl: fileUrl || null,
+        fileType: fileType || null
+      });
 
-    const newMsg = await Message.create({
-      sender: senderId,
-      receiver: receiverId,
-      message: message || '', // ensure fallback
-      fileUrl: fileUrl || null,  // make sure these fields exist in your Message schema
-      fileType: fileType || null
-    });
+      const sendToUserSockets = (userId, msg) => {
+        const sockets = onlineUsers.get(userId);
+        if (sockets) {
+          sockets.forEach(sockId => io.to(sockId).emit('receiveMessage', msg));
+        }
+      };
 
-    const sendToUserSockets = (userId, msg) => {
-      const sockets = onlineUsers.get(userId);
-      if (sockets) {
-        sockets.forEach(sockId => io.to(sockId).emit('receiveMessage', msg));
-      }
-    };
+      sendToUserSockets(senderId, newMsg);   // Notify sender
+      sendToUserSockets(receiverId, newMsg); // Notify receiver
+    } catch (err) {
+      console.error("Error in sendMessage:", err);
+    }
+  });
 
-    sendToUserSockets(senderId, newMsg);   // Send to all tabs/devices of sender
-    sendToUserSockets(receiverId, newMsg); // Send to all tabs/devices of receiver
+  // Handle disconnect
+  socket.on('disconnect', async () => {
+    for (let [userId, socketSet] of onlineUsers.entries()) {
+      socketSet.delete(socket.id);
+      if (socketSet.size === 0) {
+        onlineUsers.delete(userId);
 
-  } catch (err) {
-    console.error("Error in sendMessage:", err);
-  }
-});
-
-
-  // Cleanup on disconnect
- socket.on('disconnect', async () => {
-  for (let [userId, socketSet] of onlineUsers.entries()) {
-    socketSet.delete(socket.id);
-    if (socketSet.size === 0) {
-      onlineUsers.delete(userId);
-
-      // Update last seen
-      try {
-        await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
-      } catch (err) {
-        console.error('Failed to update last seen:', err);
+        // 🕒 Update lastSeen in DB
+        try {
+          await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
+        } catch (err) {
+          console.error('Failed to update last seen:', err);
+        }
       }
     }
-  }
-  io.emit('onlineUsers', Array.from(onlineUsers.keys()));
-  console.log('Socket disconnected:', socket.id);
+    io.emit('onlineUsers', Array.from(onlineUsers.keys()));
+    console.log('Socket disconnected:', socket.id);
+  });
 });
-})
 
 // module.exports = server;
 
