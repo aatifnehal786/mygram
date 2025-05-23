@@ -497,7 +497,7 @@ app.get("/allusers1", auth, async (req, res) => {
 });
 app.get("/allusers2", auth, async (req, res) => {
   try {
-    const loggedInUserId = req.user._id; // assuming `auth` middleware attaches the user object
+     
     const users = await User.find(); // exclude current user
     res.status(200).json(users);
   } catch (error) {
