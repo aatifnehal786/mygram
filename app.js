@@ -606,6 +606,11 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('getOnlineStatus', (userId, cb) => {
+  cb(onlineUsers.has(userId));
+});
+
+
   // ✅ Must be inside io.on('connection', socket => { ... })
   socket.on('disconnect', async () => {
     for (let [userId, socketSet] of onlineUsers.entries()) {
