@@ -590,34 +590,40 @@ io.on('connection', (socket) => {
     onlineUsers.get(userId).add(socket.id);
     io.emit('onlineUsers', Array.from(onlineUsers.keys()));
   });
+socket.on('sendMessage', async ({ senderId, receiverId, message, fileUrl, fileType, isForwarded }) => {
+  try {
+    const sender = await User.findById(senderId);
+    const receiver = await User.findById(receiverId);
+    if (!sender || !receiver) return;
 
-  socket.on('sendMessage', async ({ senderId, receiverId, message, fileUrl, fileType }) => {
-    try {
-      const sender = await User.findById(senderId);
-      const receiver = await User.findById(receiverId);
-      if (!sender || !receiver) return;
+    const newMsg = await Message.create({
+      sender: senderId,
+      receiver: receiverId,
+      message: message || '',
+      fileUrl: fileUrl || null,
+      fileType: fileType || null,
+      isForwarded: isForwarded || false,
+    });
 
-      const newMsg = await Message.create({
-        sender: senderId,
-        receiver: receiverId,
-        message: message || '',
-        fileUrl: fileUrl || null,
-        fileType: fileType || null
-      });
+    const sendToUserSockets = (userId, msg) => {
+      const sockets = onlineUsers.get(userId);
+      if (sockets) {
+        sockets.forEach(sockId => {
+          io.to(sockId).emit('receiveMessage', msg); // ✅ Emit to all sockets of user
+        });
+      }
+    };
 
-      const sendToUserSockets = (userId, msg) => {
-        const sockets = onlineUsers.get(userId);
-        if (sockets) {
-          sockets.forEach(sockId => io.to(sockId).emit('receiveMessage', msg));
-        }
-      };
+    // ✅ Send to both sender and receiver
+    sendToUserSockets(senderId, newMsg);   // <-- this was missing before!
+    sendToUserSockets(receiverId, newMsg);
+  } catch (err) {
+    console.error("Error in sendMessage:", err);
+  }
+});
 
-      sendToUserSockets(senderId, newMsg);
-      sendToUserSockets(receiverId, newMsg);
-    } catch (err) {
-      console.error("Error in sendMessage:", err);
-    }
-  });
+
+
 
   socket.on('getOnlineStatus', (userId, cb) => {
   cb(onlineUsers.has(userId));
