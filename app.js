@@ -751,7 +751,7 @@ app.get('/chat-list', auth, async (req, res) => {
 });
 
 
-app.post("/chat/forward",auth, async (req, res) => {
+app.post("/chat/forward", async (req, res) => {
   const { senderId, receiverId, message, fileUrl, fileType, isForwarded } = req.body;
 
   try {
