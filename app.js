@@ -751,6 +751,26 @@ app.get('/chat-list', auth, async (req, res) => {
 });
 
 
+app.post("/chat/forward", async (req, res) => {
+  const { senderId, receiverId, message, fileUrl, fileType, isForwarded } = req.body;
+
+  try {
+    const newMsg = await Message.create({
+      sender: senderId,
+      receiver: receiverId,
+      message: message || '',
+      fileUrl: fileUrl || null,
+      fileType: fileType || null,
+      isForwarded: isForwarded || false,
+      createdAt: new Date()
+    });
+
+    res.json(newMsg);
+  } catch (err) {
+    console.error("Error in /chat/forward:", err);
+    res.status(500).json({ error: "Failed to forward message" });
+  }
+});
 
 
 
