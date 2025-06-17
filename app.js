@@ -550,19 +550,28 @@ app.post('/upload/chat', upload3.single('file'), async (req, res) => {
 });
 
 // followers list
-
-app.get("/followers/:userId",auth,async (req,res)=>{
-
+app.get("/followers/:userId", auth, async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId).populate('followers', 'username profilePic');
+    const user = await User.findById(req.params.userId).populate('followers', '_id username profilePic lastSeen');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    res.json({ followers: user.followers });
+    const onlineUserIds = Array.from(onlineUsers.keys());
+
+    const followersWithOnlineStatus = user.followers.map(f => ({
+      _id: f._id,
+      username: f.username,
+      profilePic: f.profilePic,
+      lastSeen: f.lastSeen,
+      isOnline: onlineUserIds.includes(f._id.toString())
+    }));
+
+    res.json({ followers: followersWithOnlineStatus });
   } catch (err) {
     console.error('Error fetching followers:', err);
     res.status(500).json({ message: 'Server error' });
   }
-})
+});
+
 
 // Socket setup
 
