@@ -573,6 +573,28 @@ app.get("/followers/:userId", auth, async (req, res) => {
 });
 
 
+app.delete("/delete-chat",auth,async (req,res)=>{
+
+   try {
+    const { messageIds } = req.body;
+
+
+    const result = await Message.deleteMany({ _id: { $in: messageIds } });
+
+    
+    if (!result) {
+      return res.status(400).json({ message: 'No message IDs provided' });
+    }
+
+    res.status(200).json({
+      message: `${result.deletedCount} message(s) deleted successfully.`,
+    });
+  } catch (error) {
+    console.error('Error deleting messages:', error);
+    res.status(500).json({ message: 'Server error while deleting messages' });
+  }
+})
+
 // Socket setup
 
 
