@@ -521,32 +521,17 @@ app.get("/allPosts", async (req, res) => {
 // const cloudinary = require('../utils/cloudinary');
 // const multer = require('multer');
 const streamifier = require('streamifier');
+
 const upload3 = multer();
 
 app.post('/upload/chat', upload3.single('file'), async (req, res) => {
   try {
-    const mimeType = req.file.mimetype;
-    const mainType = mimeType.split('/')[0];
+    const fileType = req.file.mimetype.split('/')[0]; // image, video, audio, etc.
 
-    // Determine correct resource_type
-    let resourceType = 'auto'; // default
-    if (
-      mimeType === 'application/pdf' ||
-      mimeType === 'application/msword' ||
-      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      mimeType.startsWith('text/')
-    ) {
-      resourceType = 'raw'; // for documents
-    }
-
-    const streamUpload = () =>
+    const streamUpload = (req) =>
       new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            resource_type: resourceType,
-            folder: 'chat_files',
-            type: 'upload', // ensure public access
-          },
+        let stream = cloudinary.uploader.upload_stream(
+          { resource_type: 'auto', folder: 'chat_files' },
           (error, result) => {
             if (result) resolve(result);
             else reject(error);
@@ -555,15 +540,14 @@ app.post('/upload/chat', upload3.single('file'), async (req, res) => {
         streamifier.createReadStream(req.file.buffer).pipe(stream);
       });
 
-    const result = await streamUpload();
+    const result = await streamUpload(req);
 
-    res.json({ fileUrl: result.secure_url, fileType: mimeType });
+    res.json({ fileUrl: result.secure_url, fileType: req.file.mimetype });
   } catch (err) {
     console.error('Upload error:', err);
     res.status(500).json({ error: 'Upload failed' });
   }
 });
-
 
 // followers list
 app.get("/followers/:userId", auth, async (req, res) => {
