@@ -709,6 +709,16 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('reject-call', ({ to }) => {
+  const targetSockets = onlineUsers.get(to);
+  if (targetSockets) {
+    targetSockets.forEach(sockId =>
+      io.to(sockId).emit('call-rejected')  // this should match frontend listener
+    );
+  }
+});
+
+
   socket.on('disconnect', async () => {
     for (let [userId, socketSet] of onlineUsers.entries()) {
       socketSet.delete(socket.id);
