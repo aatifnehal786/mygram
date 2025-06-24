@@ -639,45 +639,76 @@ io.on('connection', (socket) => {
   });
 
   socket.on('sendMessage', async ({ senderId, receiverId, message, fileUrl, fileType, isForwarded }) => {
-  try {
-    const sender = await User.findById(senderId);
-    const receiver = await User.findById(receiverId);
-    if (!sender || !receiver) return;
+    try {
+      const sender = await User.findById(senderId);
+      const receiver = await User.findById(receiverId);
+      if (!sender || !receiver) return;
 
-    const newMsg = await Message.create({
-      sender: senderId,
-      receiver: receiverId,
-      message: message || '',
-      fileUrl: fileUrl || null,
-      fileType: fileType || null,
-      isForwarded: isForwarded || false,
-      createdAt: new Date() // optional if you want to control time
-    });
+      const newMsg = await Message.create({
+        sender: senderId,
+        receiver: receiverId,
+        message: message || '',
+        fileUrl: fileUrl || null,
+        fileType: fileType || null,
+        isForwarded: isForwarded || false,
+        createdAt: new Date()
+      });
 
-    const sendToUserSockets = (userId, msg) => {
-      const sockets = onlineUsers.get(userId);
-      if (sockets) {
-        sockets.forEach(sockId => io.to(sockId).emit('receiveMessage', msg));
-      }
-    };
+      const sendToUserSockets = (userId, msg) => {
+        const sockets = onlineUsers.get(userId);
+        if (sockets) {
+          sockets.forEach(sockId => io.to(sockId).emit('receiveMessage', msg));
+        }
+      };
 
-    sendToUserSockets(senderId, newMsg);
-    sendToUserSockets(receiverId, newMsg);
-  } catch (err) {
-    console.error("Error in sendMessage:", err);
-  }
-});
-
-
-
-
+      sendToUserSockets(senderId, newMsg);
+      sendToUserSockets(receiverId, newMsg);
+    } catch (err) {
+      console.error("Error in sendMessage:", err);
+    }
+  });
 
   socket.on('getOnlineStatus', (userId, cb) => {
-  cb(onlineUsers.has(userId));
-});
+    cb(onlineUsers.has(userId));
+  });
 
+  // ✅ Video/Audio Call Signaling Events
+  socket.on('call-user', ({ from, to, offer }) => {
+    const targetSockets = onlineUsers.get(to);
+    if (targetSockets) {
+      targetSockets.forEach(sockId =>
+        io.to(sockId).emit('incoming-call', { from, offer })
+      );
+    }
+  });
 
-  // ✅ Must be inside io.on('connection', socket => { ... })
+  socket.on('answer-call', ({ to, answer }) => {
+    const targetSockets = onlineUsers.get(to);
+    if (targetSockets) {
+      targetSockets.forEach(sockId =>
+        io.to(sockId).emit('call-answered', { answer })
+      );
+    }
+  });
+
+  socket.on('ice-candidate', ({ to, candidate }) => {
+    const targetSockets = onlineUsers.get(to);
+    if (targetSockets) {
+      targetSockets.forEach(sockId =>
+        io.to(sockId).emit('ice-candidate', { candidate })
+      );
+    }
+  });
+
+  socket.on('end-call', ({ to }) => {
+    const targetSockets = onlineUsers.get(to);
+    if (targetSockets) {
+      targetSockets.forEach(sockId =>
+        io.to(sockId).emit('call-ended')
+      );
+    }
+  });
+
   socket.on('disconnect', async () => {
     for (let [userId, socketSet] of onlineUsers.entries()) {
       socketSet.delete(socket.id);
