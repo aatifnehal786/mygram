@@ -673,12 +673,12 @@ io.on('connection', (socket) => {
   });
 
   // ✅ Video/Audio Call Signaling Events
-socket.on('call-user', ({ from, to, offer, type }) => {
-  console.log('📤 Calling user', to, 'from', from, 'type:', type);
+socket.on('call-user', ({ from, to, offer }) => {
+  // console.log('📤 Calling user', to, 'from', from, 'type:', type);
   const targetSockets = onlineUsers.get(to);
   if (targetSockets) {
     targetSockets.forEach(sockId =>
-      io.to(sockId).emit('incoming-call', { from, offer, type }) // ✅ include type
+      io.to(sockId).emit('incoming-call', { from, offer }) // ✅ include type
     );
   }
 });
