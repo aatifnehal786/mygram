@@ -855,8 +855,9 @@ app.post("/chat/forward", async (req, res) => {
       createdAt: new Date()
     });
 
-    const io = req.app.get('socketio'); // assuming this was set in your server.js
-    io.to(receiverId).emit("receiveMessage", newMsg); //
+     if (socket) {
+    socket.emit("sendMessage", newMsg);
+  }
 
     res.json(newMsg);
   } catch (err) {
