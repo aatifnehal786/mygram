@@ -623,7 +623,7 @@ app.delete("/delete-chat",auth,async (req,res)=>{
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "https://wonderful-croquembouche-552960.netlify.app",
+    origin: "https://mygram247.netlify.app",
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   }
