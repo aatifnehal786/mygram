@@ -11,13 +11,11 @@ const Post = require('./postModel')
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const app = express();
-app.use(cors(
-     {
-    origin: "https://wonderful-croquembouche-552960.netlify.app",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  }
-))
+app.use(cors({
+  origin: "https://wonderful-croquembouche-552960.netlify.app",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true,
+}));
 app.use(express.json());
 const auth = require('./auth')
 // const multer = require('multer')
