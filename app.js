@@ -855,11 +855,13 @@ app.post("/chat/forward", async (req, res) => {
       createdAt: new Date()
     });
 
-     if (socket) {
-    socket.emit("sendMessage", newMsg);
-  }
+
 
     res.json(newMsg);
+
+         if (socket) {
+    socket.emit("sendMessage", newMsg);
+  }
   } catch (err) {
     console.error("Error in /chat/forward:", err);
     res.status(500).json({ error: "Failed to forward message" });
