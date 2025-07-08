@@ -859,9 +859,8 @@ app.post("/chat/forward", async (req, res) => {
 
     res.json(newMsg);
 
-         if (socket) {
-    socket.emit("sendMessage", newMsg);
-  }
+        
+  
   } catch (err) {
     console.error("Error in /chat/forward:", err);
     res.status(500).json({ error: "Failed to forward message" });
