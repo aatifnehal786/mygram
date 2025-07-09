@@ -13,7 +13,7 @@ const crypto = require("crypto");
 const app = express();
 app.use(cors(
      {
-    origin: "https://wonderful-croquembouche-552960.netlify.app",
+    origin: "https://mygram247.netlify.app",
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   }
