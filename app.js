@@ -11,13 +11,12 @@ const Post = require('./postModel')
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const app = express();
-app.use(cors(
-     {
-    origin: "https://mygram247.netlify.app",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  }
-))
+const corsOptions = {
+    origin: 'https://mygram247.netlify.app',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 const auth = require('./auth')
 // const multer = require('multer')
