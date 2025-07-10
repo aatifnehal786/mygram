@@ -36,6 +36,16 @@ console.log("AUTH:", process.env.TWILIO_AUTH_TOKEN);
 console.log("VERIFY:", process.env.TWILIO_VERIFY_SID);
 
 
+// Download the helper library from https://www.twilio.com/docs/node/install
+// const twilio = require("twilio"); // Or, for ESM: import twilio from "twilio";
+
+// Find your Account SID and Auth Token at twilio.com/console
+// and set the environment variables. See http://twil.io/secure
+
+
+
+
+
 mongoose.connect(process.env.MONGO_URL)
     .then(() => console.log(`Database connection successful, ${process.env.MONGO_URL}`))
     .catch((err) => console.log(err));
