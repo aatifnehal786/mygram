@@ -12,7 +12,7 @@ const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const app = express();
 app.use(cors({
-  origin: "https://mygram247.netlify.app", // Allow only your frontend
+  origin: "*", // Allow only your frontend
   credentials: true, // If you're sending cookies or auth headers
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 }));
@@ -40,7 +40,19 @@ console.log("VERIFY:", process.env.TWILIO_VERIFY_SID);
 // Find your Account SID and Auth Token at twilio.com/console
 // and set the environment variables. See http://twil.io/secure
 
+// Download the helper library from https://www.twilio.com/docs/node/install
+ // Or, for ESM: import twilio from "twilio";
 
+// Find your Account SID and Auth Token at twilio.com/console
+// and set the environment variables. See http://twil.io/secure
+const accountSid = process.env.TWILIO_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const client2 = twilio(accountSid, authToken);
+
+client2.tokens.create().then(token => {
+  console.log("🔐 ICE Servers:");
+  console.log(token.iceServers); // Use these in your RTCPeerConnection config
+});
 
 
 
@@ -633,7 +645,7 @@ app.delete("/delete-chat",auth,async (req,res)=>{
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "https://mygram247.netlify.app",
+    origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   }
