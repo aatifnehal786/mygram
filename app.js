@@ -255,6 +255,10 @@ app.post('/user/profile-pic', auth, uploadProfilePic.single('profilePic'), async
 app.post("/forgot-password", async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
+    let user = await User.findOne({email})
+    if(!user){
+      return res.status(404).json({message:"User not Registered With This Email"})
+    }
 
     const otp = crypto.randomInt(100000, 999999).toString();
     otpStorage[email] = { otp, expiresAt: Date.now() + 5 * 60 * 1000 };
