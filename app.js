@@ -72,6 +72,9 @@ app.post("/signup",async (req,res)=>{
     let { username, email, password, mobile } = req.body;
     const olduser = await User.findOne({ email: email });
     if (olduser) return res.status(403).send({ message: "User already registered" });
+
+    const oldUsername = await User.findOne({username:username})
+    if(oldUsername) return res.status(403).json({message:"Choose Different Username, Username already exists"})
     
 
      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
