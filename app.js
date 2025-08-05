@@ -74,6 +74,19 @@ app.post("/signup",async (req,res)=>{
     if (olduser) return res.status(403).send({ message: "User already registered" });
     
 
+     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+    const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(password)) {
+    return res.status(401).json({
+      message:
+        "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+    });
+  }
+
     try {
         const salt = await bcrypt.genSalt(10);
         password = await bcrypt.hash(password, salt);
@@ -255,6 +268,10 @@ app.post('/user/profile-pic', auth, uploadProfilePic.single('profilePic'), async
 app.post("/forgot-password", async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
     let user = await User.findOne({email})
     if(!user){
       return res.status(404).json({message:"User not Registered With This Email"})
@@ -286,6 +303,15 @@ app.post("/reset-password", async (req, res) => {
     if (!storedData || storedData.otp !== otp || storedData.expiresAt < Date.now()) {
         return res.status(400).json({ error: "Invalid or expired OTP" });
     }
+
+      const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(newPass)) {
+    return res.status(401).json({
+      message:
+        "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+    });
+  }
 
     try {
         const user = await User.findOne({ email });
