@@ -558,7 +558,8 @@ app.post('/upload/chat', upload3.single('file'), async (req, res) => {
       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       mimeType.startsWith('text/')
     ) {
-      resourceType = 'raw'; // for documents
+      resourceType = 'raw';
+        // for documents
     }
 
     const streamUpload = () =>
