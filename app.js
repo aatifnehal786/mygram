@@ -921,6 +921,46 @@ app.post("/chat/forward", async (req, res) => {
 
 
 
+app.post("/set-chat-pin", async (req, res) => {
+  try {
+    const { userId, pin } = req.body;
+    if (!/^\d{4}$/.test(pin)) return res.status(400).json({ msg: "PIN must be 4 digits" });
+
+    const hashedPin = await bcrypt.hash(pin, 10);
+    await User.findByIdAndUpdate(userId, { chatPin: hashedPin });
+
+    res.json({ msg: "Chat PIN set successfully" });
+  } catch (err) {
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+app.post("/verify-chat-pin", async (req, res) => {
+  try {
+    const { userId, pin } = req.body;
+    if (!/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ msg: "PIN must be 4 digits" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user || !user.chatPin) {
+      return res.status(404).json({ msg: "No PIN set for this user" });
+    }
+
+    const isMatch = await bcrypt.compare(pin, user.chatPin);
+    if (!isMatch) {
+      return res.status(400).json({ msg: "Incorrect PIN" });
+    }
+
+    res.json({ msg: "PIN verified successfully" });
+  } catch (err) {
+    console.error("Error verifying chat pin:", err); // 👈 log actual error
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+
+
 server.listen(port, () => {
     console.log(`Server is up and running on port ${port}`);
 });

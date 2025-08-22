@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 // const { boolean } = require('webidl-conversions');
 
+
 const userSchema =  mongoose.Schema({
     username: { type: String, required: true, unique: true },
     email:    { type: String, required: true, unique: true },
@@ -16,8 +17,13 @@ const userSchema =  mongoose.Schema({
         }
       },
       profilePic: {
-        type: String
+        type: String,
+        
       },
+      chatPin: {
+    type: String, // store hashed 4 digit pin
+    default: null
+  },
       followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }],
       following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }],
       
