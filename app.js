@@ -959,7 +959,30 @@ app.post("/verify-chat-pin", async (req, res) => {
   }
 });
 
+app.post("/check-chat-pin",auth,async(req,res)=>{
+   try {
+    const { userId } = req.body;
 
+    if (!userId) {
+      return res.status(400).json({ msg: "User ID is required" });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    if (user.chatPin) {
+      return res.json({ hasPin: true, msg: "Chat PIN already set" });
+    }
+
+    res.json({ hasPin: false, msg: "No PIN set yet" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
+  }
+})
 
 server.listen(port, () => {
     console.log(`Server is up and running on port ${port}`);
