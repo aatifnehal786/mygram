@@ -984,6 +984,26 @@ app.post("/check-chat-pin",auth,async(req,res)=>{
   }
 })
 
+
+// removeChatPin.js (controller or directly in your routes file)
+app.post("/remove-chat-pin", async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    // assuming you store pin in User collection
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.chatPin = null; // remove chat pin
+    await user.save();
+
+    res.json({ message: "Chat lock removed successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error removing chat lock", error: err.message });
+  }
+});
+
+
 server.listen(port, () => {
     console.log(`Server is up and running on port ${port}`);
 });
