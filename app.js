@@ -936,26 +936,23 @@ app.post("/set-chat-pin", async (req, res) => {
 });
 
 app.post("/verify-chat-pin", async (req, res) => {
+  const { userId, pin } = req.body;
+
+  if (!userId || !pin) return res.status(400).json({ message: "User ID and PIN are required" });
+
   try {
-    const { userId, pin } = req.body;
-    if (!/^\d{4}$/.test(pin)) {
-      return res.status(400).json({ msg: "PIN must be 4 digits" });
-    }
-
     const user = await User.findById(userId);
-    if (!user || !user.chatPin) {
-      return res.status(404).json({ msg: "No PIN set for this user" });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    const isMatch = await bcrypt.compare(pin, user.chatPin);
-    if (!isMatch) {
-      return res.status(400).json({ msg: "Incorrect PIN" });
+    // Ensure both are strings for accurate comparison
+    if (user.chatPin && user.chatPin.toString() === pin.toString()) {
+      return res.json({ message: "PIN verified successfully" });
+    } else {
+      return res.status(400).json({ message: "Invalid PIN" });
     }
-
-    res.json({ msg: "PIN verified successfully" });
   } catch (err) {
-    console.error("Error verifying chat pin:", err); // 👈 log actual error
-    res.status(500).json({ msg: "Server error" });
+    console.error(err);
+    return res.status(500).json({ message: "Server error" });
   }
 });
 
