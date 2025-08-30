@@ -1035,22 +1035,23 @@ app.post("/forgot-chat-pin", async (req, res) => {
 app.post("/reset-chat-pin", async (req, res) => {
   const { email, otp, newPin } = req.body;
 
-  if (!email || !otp || !newPin) return res.status(400).json({ message: "All fields are required" });
+  if (!email || !otp || !newPin)
+    return res.status(400).json({ message: "All fields are required" });
 
   const record = chatPinOtpStorage[email];
-  if (!record) return res.status(400).json({ message: "No OTP requested for this email" });
+  if (!record)
+    return res.status(400).json({ message: "No OTP requested for this email" });
 
   if (record.otp !== otp) return res.status(400).json({ message: "Invalid OTP" });
   if (Date.now() > record.expiresAt) return res.status(400).json({ message: "OTP expired" });
 
-  // Set new chat PIN
-  const user = await User.findById(record.userId);
+  // Fetch user using email (not ID from storage) to avoid mismatch
+  const user = await User.findOne({ email });
   if (!user) return res.status(404).json({ message: "User not found" });
 
-  user.chatPin = newPin;
+  user.chatPin = newPin.toString(); // store as string
   await user.save();
 
-  // Delete OTP after successful reset
   delete chatPinOtpStorage[email];
 
   res.json({ message: "Chat PIN reset successfully" });
