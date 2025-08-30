@@ -985,6 +985,78 @@ app.post("/check-chat-pin",auth,async(req,res)=>{
 })
 
 
+
+
+// In-memory OTP storage (you can move this to DB if needed)
+const chatPinOtpStorage = {};
+
+// POST /forgot-chat-pin
+app.post("/forgot-chat-pin", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email is required" });
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+
+  // Check if user exists
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ message: "User not registered with this email" });
+
+  // Generate OTP
+  const otp = crypto.randomInt(100000, 999999).toString();
+
+  // Save OTP in memory with expiry
+  chatPinOtpStorage[email] = {
+    otp,
+    expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+    userId: user._id,
+  };
+
+  try {
+    // Send OTP email
+    await transporter.sendMail({
+      from: `"MyGram Chat PIN Recovery" <${process.env.MY_GMAIL}>`,
+      to: email,
+      subject: "Your Chat PIN OTP",
+      text: `Your OTP to reset your chat PIN is ${otp}. It will expire in 5 minutes.`,
+    });
+
+    res.json({ message: "OTP sent successfully" });
+  } catch (err) {
+    console.error("Error sending OTP email:", err);
+    res.status(500).json({ error: "Failed to send OTP" });
+  }
+});
+
+
+// POST /reset-chat-pin
+app.post("/reset-chat-pin", async (req, res) => {
+  const { email, otp, newPin } = req.body;
+
+  if (!email || !otp || !newPin) return res.status(400).json({ message: "All fields are required" });
+
+  const record = chatPinOtpStorage[email];
+  if (!record) return res.status(400).json({ message: "No OTP requested for this email" });
+
+  if (record.otp !== otp) return res.status(400).json({ message: "Invalid OTP" });
+  if (Date.now() > record.expiresAt) return res.status(400).json({ message: "OTP expired" });
+
+  // Set new chat PIN
+  const user = await User.findById(record.userId);
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  user.chatPin = newPin;
+  await user.save();
+
+  // Delete OTP after successful reset
+  delete chatPinOtpStorage[email];
+
+  res.json({ message: "Chat PIN reset successfully" });
+});
+
+
 // removeChatPin.js (controller or directly in your routes file)
 app.post("/remove-chat-pin", async (req, res) => {
   try {
