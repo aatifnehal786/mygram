@@ -940,21 +940,15 @@ app.post("/verify-chat-pin", async (req, res) => {
 
   if (!userId || !pin) return res.status(400).json({ message: "User ID and PIN are required" });
 
-  try {
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+  const user = await User.findById(userId);
+  if (!user || !user.chatPin) return res.status(404).json({ message: "PIN not set" });
 
-    // Ensure both are strings for accurate comparison
-    if (user.chatPin && user.chatPin.toString() === pin.toString()) {
-      return res.json({ message: "PIN verified successfully" });
-    } else {
-      return res.status(400).json({ message: "Invalid PIN" });
-    }
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "Server error" });
-  }
+  const isMatch = await bcrypt.compare(pin, user.chatPin);
+  if (!isMatch) return res.status(400).json({ message: "Invalid PIN" });
+
+  res.json({ message: "PIN verified successfully" });
 });
+
 
 app.post("/check-chat-pin",auth,async(req,res)=>{
    try {
