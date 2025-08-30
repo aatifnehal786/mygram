@@ -1023,6 +1023,8 @@ app.post("/forgot-chat-pin", async (req, res) => {
 
 
 // POST /reset-chat-pin
+
+
 app.post("/reset-chat-pin", async (req, res) => {
   const { email, otp, newPin } = req.body;
 
@@ -1036,17 +1038,20 @@ app.post("/reset-chat-pin", async (req, res) => {
   if (record.otp !== otp) return res.status(400).json({ message: "Invalid OTP" });
   if (Date.now() > record.expiresAt) return res.status(400).json({ message: "OTP expired" });
 
-  // Fetch user using email (not ID from storage) to avoid mismatch
+  // Fetch user using email
   const user = await User.findOne({ email });
   if (!user) return res.status(404).json({ message: "User not found" });
 
-  user.chatPin = newPin.toString(); // store as string
+  // 🔑 Hash the new PIN before saving
+  const hashedPin = await bcrypt.hash(newPin.toString(), 10);
+  user.chatPin = hashedPin;
   await user.save();
 
   delete chatPinOtpStorage[email];
 
   res.json({ message: "Chat PIN reset successfully" });
 });
+
 
 
 // removeChatPin.js (controller or directly in your routes file)
