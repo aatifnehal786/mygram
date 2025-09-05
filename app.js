@@ -253,7 +253,7 @@ app.post("/login", async (req, res) => {
 });
 
 // VERIFY OTP
-app.post("/verify-otp", async (req, res) => {
+app.post("/verify-device-otp", async (req, res) => {
   const { loginId, otp } = req.body;
 
   const user = await User.findOne({
