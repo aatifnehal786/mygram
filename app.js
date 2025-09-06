@@ -120,7 +120,7 @@ app.post("/signup",async (req,res)=>{
 
 // LOGIN ENDPOINT
 
-const LoginAttempt = require(".loginAttempts"); // import schema
+const LoginAttempt = require("./loginAttempts"); // import schema
 
 // LOGIN
 app.post("/login", async (req, res) => {
