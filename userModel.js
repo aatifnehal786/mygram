@@ -23,19 +23,8 @@ const userSchema = mongoose.Schema({
   isEmailVerified: { type: Boolean, default: false },
   lastSeen: { type: Date, default: Date.now },
 
-  // 🔹 new fields for login security
-  devices: [
-    {
-      signature: { type: String }, // combination of ip + user-agent
-      addedAt: { type: Date, default: Date.now }
-    }
-  ],
-  pendingOtp: {
-    otp: String,
-    deviceSignature: String,
-    createdAt: Date,
-    expiresAt: Date
-  }
+
+  
 });
 
 

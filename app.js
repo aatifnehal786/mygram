@@ -184,8 +184,8 @@ app.post("/verify-email-otp", async (req, res) => {
 // login
 // LOGIN
 app.post("/login", async (req, res) => {
-  const { loginId, password, deviceId, userAgent } = req.body;
-  const ipAddress = req.ip;
+  const { loginId, password } = req.body;
+ 
 
   try {
     const user = await User.findOne({
@@ -204,13 +204,8 @@ app.post("/login", async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Incorrect password" });
 
-    // generate device signature (harder to fake)
-    const deviceSignature = `${deviceId}_${ipAddress}_${userAgent}`;
 
-    // check if device already trusted
-    const knownDevice = user.devices?.find(d => d.signature === deviceSignature);
-
-    if (knownDevice) {
+ 
       // ✅ Normal login
       const token = jwt.sign(
         { email: user.email, id: user._id },
@@ -224,79 +219,15 @@ app.post("/login", async (req, res) => {
         userid: user._id,
         name: user.name,
       });
-    }
+    
 
-    // ❌ New device → send OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    user.pendingOtp = {
-      otp,
-      deviceSignature,
-      createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 min
-    };
-    await user.save();
-
-    // send OTP email
-    await transporter.sendMail({
-      from: process.env.MY_GMAIL,
-      to: user.email,
-      subject: "New Device Login OTP",
-      text: `Your OTP for login is ${otp}. It expires in 5 minutes.`,
-    });
-
-    return res.status(403).json({ message: "New device detected. OTP sent to email." });
+   
   } catch (err) {
     console.error("Unexpected server error:", err);
     res.status(500).json({ message: "Some problem occurred" });
   }
 });
 
-// VERIFY OTP
-app.post("/verify-device-otp", async (req, res) => {
-  const { loginId, otp } = req.body;
-
-  const user = await User.findOne({
-    $or: [
-      { email: loginId },
-      { username: loginId },
-      { mobile: loginId },
-    ],
-  });
-
-  if (!user) return res.status(404).json({ message: "User not found" });
-
-  if (
-    !user.pendingOtp ||
-    user.pendingOtp.otp !== otp ||
-    user.pendingOtp.expiresAt < new Date()
-  ) {
-    return res.status(400).json({ message: "Invalid or expired OTP" });
-  }
-
-  // ✅ OTP correct → save device permanently
-  user.devices = user.devices || [];
-  user.devices.push({
-    signature: user.pendingOtp.deviceSignature,
-    addedAt: new Date(),
-  });
-  user.pendingOtp = null;
-  await user.save();
-
-  // issue token
-  const token = jwt.sign(
-    { email: user.email, id: user._id },
-    process.env.JWT_SECRET_KEY,
-    { expiresIn: "7d" }
-  );
-
-  res.json({
-    message: "OTP verified. Login successful",
-    token,
-    userid: user._id,
-    name: user.name,
-  });
-});
 
 // Multer setup
 // middleware/upload.js
