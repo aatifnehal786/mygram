@@ -62,6 +62,22 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+// Send email function
+async function sendEmail(to, subject, text, html = null) {
+  try {
+    await transporter.sendMail({
+      from: `"Your App Name" <${process.env.MY_GMAIL}>`,
+      to,
+      subject,
+      text,
+      html: html || text,
+    });
+    console.log("✅ Email sent to:", to);
+  } catch (err) {
+    console.error("❌ Email sending error:", err);
+  }
+}
+
 const otpStorage = {};
 
 
@@ -100,6 +116,76 @@ app.post("/signup",async (req,res)=>{
         res.status(500).send({ message: "Some problem" });
     }
 })
+
+
+// LOGIN ENDPOINT
+
+const LoginAttempt = require(".loginAttempts"); // import schema
+
+// LOGIN
+app.post("/login", async (req, res) => {
+  const { loginId, password, deviceId } = req.body; // ⚡ frontend must send deviceId
+  const ipAddress = req.ip;
+
+  try {
+    const user = await User.findOne({
+      $or: [{ email: loginId }, { username: loginId }, { mobile: loginId }],
+    });
+
+    if (!user) return res.status(404).send({ message: "User not found" });
+    if (!user.isEmailVerified)
+      return res
+        .status(403)
+        .json({ message: "Email not verified. Please verify your email." });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ message: "Incorrect password" });
+
+    // ✅ Check if device already trusted
+    const trusted = user.trustedDevices.find((d) => d.deviceId === deviceId);
+
+    if (trusted) {
+      // Normal login
+      const token = jwt.sign(
+        { email: user.email, id: user._id },
+        process.env.JWT_SECRET_KEY,
+        { expiresIn: "7d" }
+      );
+
+      return res.status(200).send({
+        token,
+        message: "Login successful",
+        userid: user._id,
+        name: user.username,
+      });
+    } else {
+      // 🔐 Device not trusted → send approval email
+      const approvalToken = crypto.randomBytes(32).toString("hex");
+
+      await LoginAttempt.create({
+        userId: user._id,
+        deviceId,
+        ip: ipAddress,
+        token: approvalToken,
+      });
+
+      const approvalLink = `${process.env.CLIENT_URL}/approve-login?token=${approvalToken}`;
+      await sendEmail(
+        user.email,
+        "New Login Attempt",
+        `We noticed a login attempt from a new device (IP: ${ipAddress}).\n\nIf this was you, click the link to approve: ${approvalLink}`
+      );
+
+      return res
+        .status(403)
+        .json({ message: "Approval required. Check your email." });
+    }
+  } catch (err) {
+    console.error("Unexpected server error:", err);
+    res.status(500).json({ message: "Some problem occurred" });
+  }
+});
+
  
 // send-otp endpoint
 
@@ -116,6 +202,32 @@ app.post("/send-otp", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// APPROVE LOGIN MULTIPLE DEVICES
+app.get("/approve-login", async (req, res) => {
+  const { token } = req.query;
+
+  const attempt = await LoginAttempt.findOne({ token, approved: false });
+  if (!attempt) return res.status(400).send("Invalid or expired link");
+
+  await User.updateOne(
+    { _id: attempt.userId },
+    {
+      $push: {
+        trustedDevices: {
+          deviceId: attempt.deviceId,
+          ip: attempt.ip,
+          approvedAt: new Date(),
+        },
+      },
+    }
+  );
+
+  await LoginAttempt.updateOne({ _id: attempt._id }, { approved: true });
+
+  res.send("Device approved! Please login again from your new device.");
+});
+
 
 app.post("/verify-otp", async (req, res) => {
   const { mobile, otp } = req.body;
@@ -181,52 +293,6 @@ app.post("/verify-email-otp", async (req, res) => {
   }
 });
 
-// login
-// LOGIN
-app.post("/login", async (req, res) => {
-  const { loginId, password } = req.body;
- 
-
-  try {
-    const user = await User.findOne({
-      $or: [
-        { email: loginId },
-        { username: loginId },
-        { mobile: loginId },
-      ],
-    });
-
-    if (!user) return res.status(404).send({ message: "User not found" });
-    if (!user.isEmailVerified) {
-      return res.status(403).json({ message: "Email not verified. Please verify your email to login." });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: "Incorrect password" });
-
-
- 
-      // ✅ Normal login
-      const token = jwt.sign(
-        { email: user.email, id: user._id },
-        process.env.JWT_SECRET_KEY,
-        { expiresIn: "7d" }
-      );
-
-      return res.status(200).send({
-        token,
-        message: "Login successful",
-        userid: user._id,
-        name: user.name,
-      });
-    
-
-   
-  } catch (err) {
-    console.error("Unexpected server error:", err);
-    res.status(500).json({ message: "Some problem occurred" });
-  }
-});
 
 
 // Multer setup

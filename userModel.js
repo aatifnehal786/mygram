@@ -1,5 +1,4 @@
-const mongoose = require('mongoose');
-// const { boolean } = require('webidl-conversions');
+const mongoose = require("mongoose");
 
 const userSchema = mongoose.Schema({
   username: { type: String, required: true, unique: true },
@@ -10,23 +9,27 @@ const userSchema = mongoose.Schema({
     unique: true,
     validate: {
       validator: function (v) {
-        return /^[6-9]\d{9}$/.test(v); // Validates Indian 10-digit mobile numbers
+        return /^[6-9]\d{9}$/.test(v);
       },
-      message: (props) => `${props.value} is not a valid mobile number!`
-    }
+      message: (props) => `${props.value} is not a valid mobile number!`,
+    },
   },
   profilePic: { type: String },
-  chatPin: { type: String, default: null }, // store hashed 4 digit pin
+  chatPin: { type: String, default: null },
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
   password: { type: String, required: true },
   isEmailVerified: { type: Boolean, default: false },
   lastSeen: { type: Date, default: Date.now },
 
-
-  
+  // 🔐 New field for device trust
+  trustedDevices: [
+    {
+      deviceId: String,
+      ip: String,
+      approvedAt: Date,
+    },
+  ],
 });
 
-
-
-module.exports = mongoose.model('users', userSchema);
+module.exports = mongoose.model("users", userSchema);
