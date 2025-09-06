@@ -27,11 +27,7 @@ const {Server} = require('socket.io');
 const {createServer} = require('http');
 const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 4000;
-// Serve uploaded images statically
-// app.use('/uploads', express.static('uploads'));
-console.log("SID:", process.env.TWILIO_SID);
-console.log("AUTH:", process.env.TWILIO_AUTH_TOKEN);
-console.log("VERIFY:", process.env.TWILIO_VERIFY_SID);
+const LoginAttempt = require("./loginAttempts"); // import schema
 
 
 // Download the helper library from https://www.twilio.com/docs/node/install
@@ -62,21 +58,6 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Send email function
-async function sendEmail(to, subject, text, html = null) {
-  try {
-    await transporter.sendMail({
-      from: `"Your App Name" <${process.env.MY_GMAIL}>`,
-      to,
-      subject,
-      text,
-      html: html || text,
-    });
-    console.log("✅ Email sent to:", to);
-  } catch (err) {
-    console.error("❌ Email sending error:", err);
-  }
-}
 
 const otpStorage = {};
 
@@ -120,69 +101,93 @@ app.post("/signup",async (req,res)=>{
 
 // LOGIN ENDPOINT
 
-const LoginAttempt = require("./loginAttempts"); // import schema
 
-// LOGIN
 app.post("/login", async (req, res) => {
-  const { loginId, password, deviceId } = req.body; // ⚡ frontend must send deviceId
+  const { loginId, password, deviceId } = req.body;
   const ipAddress = req.ip;
 
   try {
     const user = await User.findOne({
-      $or: [{ email: loginId }, { username: loginId }, { mobile: loginId }],
+      $or: [
+        { email: loginId },
+        { username: loginId },
+        { mobile: loginId },
+      ],
     });
 
     if (!user) return res.status(404).send({ message: "User not found" });
-    if (!user.isEmailVerified)
-      return res
-        .status(403)
-        .json({ message: "Email not verified. Please verify your email." });
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ message: "Email not verified." });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Incorrect password" });
 
-    // ✅ Check if device already trusted
-    const trusted = user.trustedDevices.find((d) => d.deviceId === deviceId);
+    // ✅ First device: auto-approve
+    if (user.devices.length === 0) {
+      user.devices.push({ deviceId, ip: ipAddress, approved: true });
+      await user.save();
 
-    if (trusted) {
-      // Normal login
-      const token = jwt.sign(
-        { email: user.email, id: user._id },
-        process.env.JWT_SECRET_KEY,
-        { expiresIn: "7d" }
-      );
-
-      return res.status(200).send({
-        token,
-        message: "Login successful",
-        userid: user._id,
-        name: user.username,
-      });
-    } else {
-      // 🔐 Device not trusted → send approval email
-      const approvalToken = crypto.randomBytes(32).toString("hex");
-
-      await LoginAttempt.create({
-        userId: user._id,
-        deviceId,
-        ip: ipAddress,
-        token: approvalToken,
-      });
-
-      const approvalLink = `${process.env.CLIENT_URL}/approve-login?token=${approvalToken}`;
-      await sendEmail(
-        user.email,
-        "New Login Attempt",
-        `We noticed a login attempt from a new device (IP: ${ipAddress}).\n\nIf this was you, click the link to approve: ${approvalLink}`
-      );
-
-      return res
-        .status(403)
-        .json({ message: "Approval required. Check your email." });
+      const token = jwt.sign({ email: user.email, id: user._id }, process.env.JWT_SECRET_KEY, { expiresIn: "7d" });
+      return res.status(200).json({ token, message: "Login successful", userid: user._id });
     }
+
+    // ✅ Already approved device
+    const existingDevice = user.devices.find(d => d.deviceId === deviceId && d.approved);
+    if (existingDevice) {
+      const token = jwt.sign({ email: user.email, id: user._id }, process.env.JWT_SECRET_KEY, { expiresIn: "7d" });
+      return res.status(200).json({ token, message: "Login successful", userid: user._id });
+    }
+
+    // ✅ New device → require approval
+    const approvalToken = jwt.sign({ userId: user._id, deviceId }, process.env.JWT_SECRET_KEY, { expiresIn: "10m" });
+
+    await LoginAttempt.create({
+      userId: user._id,
+      deviceId,
+      ip: ipAddress,
+      token: approvalToken,
+    });
+
+    const approvalLink = `${process.env.CLIENT_URL}/approve-device?token=${approvalToken}`;
+    await transporter.sendMail({
+      from: process.env.MY_GMAIL,
+      to: user.email,
+      subject: "New Device Login Attempt",
+      html: `<p>We detected a login attempt from a new device.</p>
+             <p>Click <a href="${approvalLink}">here</a> to approve this login.</p>`,
+    });
+
+    return res.status(200).json({ otpRequired: true, message: "Approval email sent. Please check your inbox." });
+
   } catch (err) {
-    console.error("Unexpected server error:", err);
-    res.status(500).json({ message: "Some problem occurred" });
+    console.error("Login error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// DEVICE APPROVAL
+app.get("/approve-device", async (req, res) => {
+  try {
+    const { token } = req.query;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+
+    const attempt = await LoginAttempt.findOne({ token, approved: false });
+    if (!attempt) return res.status(400).json({ success: false, message: "Invalid or expired approval token" });
+
+    const user = await User.findById(attempt.userId);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    attempt.approved = true;
+    await attempt.save();
+
+    user.devices.push({ deviceId: attempt.deviceId, ip: attempt.ip, approved: true });
+    await user.save();
+
+    res.json({ success: true, message: "✅ Device approved. You can now log in." });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ success: false, message: "❌ Invalid or expired approval link." });
   }
 });
 
@@ -201,31 +206,6 @@ app.post("/send-otp", async (req, res) => {
     console.error("OTP Send Error:", err.message); // log error for debugging
     res.status(500).json({ error: err.message });
   }
-});
-
-// APPROVE LOGIN MULTIPLE DEVICES
-app.get("/approve-login", async (req, res) => {
-  const { token } = req.query;
-
-  const attempt = await LoginAttempt.findOne({ token, approved: false });
-  if (!attempt) return res.status(400).send("Invalid or expired link");
-
-  await User.updateOne(
-    { _id: attempt.userId },
-    {
-      $push: {
-        trustedDevices: {
-          deviceId: attempt.deviceId,
-          ip: attempt.ip,
-          approvedAt: new Date(),
-        },
-      },
-    }
-  );
-
-  await LoginAttempt.updateOne({ _id: attempt._id }, { approved: true });
-
-  res.send("Device approved! Please login again from your new device.");
 });
 
 

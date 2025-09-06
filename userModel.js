@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-
 const userSchema = mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
@@ -11,8 +10,8 @@ const userSchema = mongoose.Schema({
       validator: function (v) {
         return /^[6-9]\d{9}$/.test(v);
       },
-      message: (props) => `${props.value} is not a valid mobile number!`,
-    },
+      message: (props) => `${props.value} is not a valid mobile number!`
+    }
   },
   profilePic: { type: String },
   chatPin: { type: String, default: null },
@@ -22,14 +21,15 @@ const userSchema = mongoose.Schema({
   isEmailVerified: { type: Boolean, default: false },
   lastSeen: { type: Date, default: Date.now },
 
-  // 🔐 New field for device trust
-  trustedDevices: [
+  // ✅ NEW FIELD: registered devices
+  devices: [
     {
-      deviceId: String,
-      ip: String,
-      approvedAt: Date,
-    },
-  ],
+      deviceId: { type: String },   // fingerprint or random clientId
+      ip: { type: String },
+      approved: { type: Boolean, default: true }, // auto-approve first one
+      addedAt: { type: Date, default: Date.now }
+    }
+  ]
 });
 
 module.exports = mongoose.model("users", userSchema);
