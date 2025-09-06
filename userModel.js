@@ -21,15 +21,7 @@ const userSchema = mongoose.Schema({
   isEmailVerified: { type: Boolean, default: false },
   lastSeen: { type: Date, default: Date.now },
 
-  // ✅ NEW FIELD: registered devices
-  devices: [
-    {
-      deviceId: { type: String },   // fingerprint or random clientId
-      ip: { type: String },
-      approved: { type: Boolean, default: true }, // auto-approve first one
-      addedAt: { type: Date, default: Date.now }
-    }
-  ]
+
 });
 
 module.exports = mongoose.model("users", userSchema);
