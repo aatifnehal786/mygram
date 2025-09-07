@@ -121,93 +121,67 @@ async function sendOtpEmail(email, otp) {
 }
 
 app.post("/login", async (req, res) => {
-  const { loginId, password } = req.body;
+  const { loginId, password, deviceId } = req.body;
+  const ipAddress = req.ip;
 
   try {
-    // 🔍 find user by email, username, or mobile
     const user = await User.findOne({
       $or: [{ email: loginId }, { username: loginId }, { mobile: loginId }],
     });
 
-    if (!user) return res.status(404).send({ message: "User not found" });
-    if (!user.isEmailVerified) {
-      return res
-        .status(403)
-        .json({ message: "Email not verified. Please verify your email." });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user.isEmailVerified)
+      return res.status(403).json({ message: "Email not verified" });
 
-    // ✅ check password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(401).json({ message: "Incorrect password" });
+    if (!isMatch) return res.status(401).json({ message: "Incorrect password" });
 
-    // ✅ capture device info
-    const ipAddress =
-      req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+    // Parse User-Agent
     const agent = useragent.parse(req.headers["user-agent"]);
     const userAgentStr = agent.toString();
 
-    // 🔍 check if this device exists
-    let device = user.devices.find(
-      (d) => d.ip === ipAddress && d.userAgent === userAgentStr
-    );
+    // Check if device exists
+    const existingDevice = user.devices.find(d => d.deviceId === deviceId);
 
-    // 🟢 Case 1: First login → trust device
-    if (user.devices.length === 0) {
+    if (existingDevice) {
+      if (existingDevice.authorized) {
+        // ✅ Device authorized → normal login
+        const token = jwt.sign(
+          { email: user.email, id: user._id },
+          process.env.JWT_SECRET_KEY,
+          { expiresIn: "7d" }
+        );
+
+        return res.status(200).json({
+          token,
+          message: "Login successful",
+          userid: user._id,
+          name: user.username,
+        });
+      } else {
+        // ⚠️ Device exists but not authorized → send OTP
+        // generate OTP
+        const otp = crypto.randomInt(100000, 999999).toString();
+        otpStorage[user.email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 };
+
+        // send email (nodemailer)
+        await transporter.sendMail({
+          from: `"Instagram" <${process.env.MY_GMAIL}>`,
+          to: user.email,
+          subject: "Your OTP Code",
+          text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
+        });
+
+        return res.status(200).json({
+          otpRequired: true,
+          message: "New device detected. OTP sent to email.",
+          email: user.email,
+        });
+      }
+    } else {
+      // ⚡ New device → add device with authorized: false and send OTP
       user.devices.push({
-        ip: ipAddress,
-        userAgent: userAgentStr,
-        authorized: true,
-        addedAt: new Date(),
-        lastUsed: new Date(),
-      });
-      await user.save();
-
-      const token = jwt.sign(
-        { email: user.email, id: user._id },
-        process.env.JWT_SECRET_KEY,
-        { expiresIn: "7d" }
-      );
-
-      return res.status(200).send({
-        token,
-        message: "Login successful (first device trusted)",
-        userid: user._id,
-        name: user.username,
-      });
-    }
-
-    // 🟢 Case 2: Device exists & authorized → allow login
-    if (device && device.authorized) {
-      device.lastUsed = new Date();
-      await user.save();
-
-      const token = jwt.sign(
-        { email: user.email, id: user._id },
-        process.env.JWT_SECRET_KEY,
-        { expiresIn: "7d" }
-      );
-
-      return res.status(200).send({
-        token,
-        message: "Login successful",
-        userid: user._id,
-        name: user.username,
-      });
-    }
-
-    // 🔴 Case 3: New device → send OTP
-    if (!device) {
-      const otp = crypto.randomInt(100000, 999999).toString();
-
-      // save OTP temporarily in memory
-      otpStorage[user.email] = {
-        otp,
-        expiresAt: Date.now() + 10 * 60 * 1000, // 10 min expiry
-      };
-
-      // push new device as unauthorized
-      user.devices.push({
+        deviceId,
         ip: ipAddress,
         userAgent: userAgentStr,
         authorized: false,
@@ -215,29 +189,25 @@ app.post("/login", async (req, res) => {
       });
       await user.save();
 
-      try {
-        await sendOtpEmail(user.email, otp);
-        return res.status(403).json({
-          message: "New device detected. OTP sent to email.",
-          requiresOtp: true,
-          email:user.email
-        });
-      } catch (err) {
-        console.error("Error sending email:", err);
-        return res.status(500).json({ error: "Failed to send OTP" });
-      }
-    }
+      const otp = crypto.randomInt(100000, 999999).toString();
+      otpStorage[user.email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 };
 
-    // 🔴 Case 4: Device exists but not authorized yet
-    if (device && !device.authorized) {
-      return res.status(403).json({
-        message: "Device not authorized. Please verify OTP.",
-        requiresOtp: true,
+      await transporter.sendMail({
+        from: `"Instagram" <${process.env.MY_GMAIL}>`,
+        to: user.email,
+        subject: "Your OTP Code",
+        text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
+      });
+
+      return res.status(200).json({
+        otpRequired: true,
+        message: "New device detected. OTP sent to email.",
+        email: user.email,
       });
     }
   } catch (err) {
-    console.error("Unexpected server error:", err);
-    res.status(500).json({ message: "Some problem occurred" });
+    console.error("Login error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
