@@ -241,11 +241,15 @@ app.post("/login", async (req, res) => {
   }
 });
 
+// 
+
+
+
 app.post("/verify-device-otp", async (req, res) => {
   const { email, otp, deviceId } = req.body;
-  console.log(deviceId,email,otp)
+  console.log("Verify request:", deviceId, email, otp);
 
-  if (!email || !otp) {
+  if (!email || !otp || !deviceId) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
@@ -258,17 +262,23 @@ app.post("/verify-device-otp", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Parse user-agent properly
+    const agent = useragent.parse(req.headers["user-agent"]);
+    const userAgentStr = agent.toString();
+
     // Save trusted device
     user.devices.push({
       deviceId,
       ip: req.ip,
-      browser: req.headers["user-agent"],
-      lastUsed: new Date(),
+      userAgent: userAgentStr,  // ✅ matches schema
+      authorized: true,         // ✅ mark this device as authorized
+      addedAt: new Date(),
     });
 
     await user.save();
 
-    delete otpStorage[email]; // clear OTP after success
+    // Clear OTP from memory
+    delete otpStorage[email];
 
     const token = jwt.sign(
       { email: user.email, id: user._id },
@@ -287,6 +297,7 @@ app.post("/verify-device-otp", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
  
 // send-otp endpoint
