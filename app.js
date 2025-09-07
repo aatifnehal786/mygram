@@ -220,6 +220,7 @@ app.post("/login", async (req, res) => {
         return res.status(403).json({
           message: "New device detected. OTP sent to email.",
           requiresOtp: true,
+          email:user.email
         });
       } catch (err) {
         console.error("Error sending email:", err);
@@ -240,54 +241,51 @@ app.post("/login", async (req, res) => {
   }
 });
 
-
-// authorize new device
 app.post("/verify-device-otp", async (req, res) => {
-  const { email, otp } = req.body;
+  const { email, otp, deviceId } = req.body;
+  console.log(deviceId,email,otp)
 
-  const record = otpStorage[email];
-  if (!record) {
-    return res.status(400).json({ message: "No OTP found. Please request again." });
+  if (!email || !otp) {
+    return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // check expiry
-  if (Date.now() > record.expiresAt) {
-    delete otpStorage[email];
-    return res.status(400).json({ message: "OTP expired. Please request again." });
+  const storedOtp = otpStorage[email];
+  if (!storedOtp || storedOtp.otp !== otp || storedOtp.expiresAt < Date.now()) {
+    return res.status(400).json({ message: "Invalid or expired OTP" });
   }
 
-  // check OTP match
-  if (record.otp !== otp) {
-    return res.status(400).json({ message: "Invalid OTP" });
-  }
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-  // ✅ OTP is correct → mark the last added device as authorized
-  const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ message: "User not found" });
+    // Save trusted device
+    user.devices.push({
+      deviceId,
+      ip: req.ip,
+      browser: req.headers["user-agent"],
+      lastUsed: new Date(),
+    });
 
-  const lastDevice = user.devices[user.devices.length - 1];
-  if (lastDevice) {
-    lastDevice.authorized = true;
-    lastDevice.lastUsed = new Date();
     await user.save();
+
+    delete otpStorage[email]; // clear OTP after success
+
+    const token = jwt.sign(
+      { email: user.email, id: user._id },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "7d" }
+    );
+
+    res.status(200).json({
+      token,
+      message: "Device verified & login successful",
+      userid: user._id,
+      name: user.username,
+    });
+  } catch (err) {
+    console.error("OTP verification error:", err);
+    res.status(500).json({ message: "Server error" });
   }
-
-  // cleanup OTP
-  delete otpStorage[email];
-
-  // issue JWT
-  const token = jwt.sign(
-    { email: user.email, id: user._id },
-    process.env.JWT_SECRET_KEY,
-    { expiresIn: "7d" }
-  );
-
-  return res.json({
-    message: "Device authorized successfully. Login successful.",
-    token,
-    userid: user._id,
-    name: user.username,
-  });
 });
 
  
