@@ -245,6 +245,7 @@ app.post("/login", async (req, res) => {
 
 
 
+
 app.post("/verify-device-otp", async (req, res) => {
   const { email, otp, deviceId } = req.body;
   console.log("Verify request:", deviceId, email, otp);
@@ -262,23 +263,31 @@ app.post("/verify-device-otp", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Parse user-agent properly
+    // Parse user-agent
     const agent = useragent.parse(req.headers["user-agent"]);
     const userAgentStr = agent.toString();
 
-    // Save trusted device
-    user.devices.push({
-      deviceId,
-      ip: req.ip,
-      userAgent: userAgentStr,  // ✅ matches schema
-      authorized: true,         // ✅ mark this device as authorized
-      addedAt: new Date(),
-    });
+    // ✅ Check if device already exists
+    const existingDevice = user.devices.find(d => d.deviceId === deviceId);
+
+    if (existingDevice) {
+      existingDevice.ip = req.ip;
+      existingDevice.userAgent = userAgentStr;
+      existingDevice.authorized = true;
+      existingDevice.addedAt = new Date();
+    } else {
+      user.devices.push({
+        deviceId,
+        ip: req.ip,
+        userAgent: userAgentStr,
+        authorized: true,
+        addedAt: new Date(),
+      });
+    }
 
     await user.save();
 
-    // Clear OTP from memory
-    delete otpStorage[email];
+    delete otpStorage[email]; // clear OTP
 
     const token = jwt.sign(
       { email: user.email, id: user._id },
