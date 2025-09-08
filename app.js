@@ -28,7 +28,7 @@ const {createServer} = require('http');
 const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 4000;
 const useragent = require('useragent')
- const { v4: uuidv4 } = require("uuid");
+ 
 // Serve uploaded images statically
 // app.use('/uploads', express.static('uploads'));
 console.log("SID:", process.env.TWILIO_SID);
@@ -134,14 +134,13 @@ app.post("/login", async (req, res) => {
      
 
 user.devices.push({
-  deviceId: uuidv4(),
-  ip: req.ip,
-  userAgent: req.headers["user-agent"],
-  authorized: false,
-  addedAt: new Date(),
-});
-
-      await user.save();
+      deviceId: deviceId, // use frontend deviceId
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+      authorized: false,
+      addedAt: new Date(),
+      lastUsed: new Date(),
+    });
 
       const otp = crypto.randomInt(100000, 999999).toString();
       otpStorage[user.email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 };
