@@ -254,7 +254,7 @@ app.get("/get-devices", auth, async (req, res) => {
 
 // remove device
 // ✅ Remove a specific device
-app.delete("/devices/:deviceId", verifiedToken, async (req, res) => {
+app.delete("/devices/:deviceId", auth, async (req, res) => {
   const { deviceId } = req.params;
 
   try {
@@ -273,7 +273,7 @@ app.delete("/devices/:deviceId", verifiedToken, async (req, res) => {
 });
 
 // ✅ Remove all devices except current
-app.delete("/devices/remove-others/:deviceId", verifiedToken, async (req, res) => {
+app.delete("/devices/remove-others/:deviceId", auth, async (req, res) => {
   const { deviceId } = req.params;
 
   try {
