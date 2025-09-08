@@ -253,47 +253,43 @@ app.get("/get-devices", auth, async (req, res) => {
 
 
 // remove device
+// ✅ Remove a specific device
+app.delete("/devices/:deviceId", verifiedToken, async (req, res) => {
+  const { deviceId } = req.params;
 
-app.delete("/remove-device/:deviceId", auth, async (req, res) => {
   try {
-    const { deviceId } = req.params;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Remove device from user's devices list
-    await User.findByIdAndUpdate(
-      req.user._id,
-      { $pull: { devices: { deviceId } } }
-    );
+    // Filter out the device to be removed
+    user.devices = user.devices.filter(d => d.deviceId !== deviceId);
+    await user.save();
 
-    res.status(200).json({ message: "Device removed successfully" });
+    res.json({ message: "Device removed successfully", devices: user.devices });
   } catch (err) {
     console.error("Remove device error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+// ✅ Remove all devices except current
+app.delete("/devices/remove-others/:deviceId", verifiedToken, async (req, res) => {
+  const { deviceId } = req.params;
 
-// remove other devices except the current one
-
-// Remove all devices except current one
-app.delete("/remove-other-devices/:deviceId", auth, async (req, res) => {
   try {
-    const { deviceId } = req.params;
-
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     // Keep only the current device
-    user.devices = user.devices.filter((d) => d.deviceId === deviceId);
+    user.devices = user.devices.filter(d => d.deviceId === deviceId);
     await user.save();
 
-    res.status(200).json({ message: "Logged out from all other devices" });
+    res.json({ message: "Other devices removed", devices: user.devices });
   } catch (err) {
     console.error("Remove other devices error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
-
-
 
 
 // user sign up endpoint 
