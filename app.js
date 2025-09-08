@@ -237,50 +237,59 @@ app.post("/verify-device-otp", async (req, res) => {
 
 
 // get all devices 
-
-
-app.get("/get-devices", auth, async (req, res) => {
+// ✅ Get all devices
+app.get("/devices", auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("devices email username");
+    const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.status(200).json({ devices: user.devices });
+    res.json({ devices: user.devices });
   } catch (err) {
     console.error("Get devices error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-
-// remove device
-// ✅ Remove a specific device
+// ✅ Remove a single device
 app.delete("/devices/:deviceId", auth, async (req, res) => {
   const { deviceId } = req.params;
-
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Filter out the device to be removed
     user.devices = user.devices.filter(d => d.deviceId !== deviceId);
     await user.save();
 
-    res.json({ message: "Device removed successfully", devices: user.devices });
+    res.json({ message: "Device removed", devices: user.devices });
   } catch (err) {
     console.error("Remove device error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// ✅ Remove all devices except current
-app.delete("/devices/remove-others/:deviceId", auth, async (req, res) => {
-  const { deviceId } = req.params;
-
+// ✅ Remove all devices (optionally keep current)
+app.delete("/devices/remove-all", auth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Keep only the current device
+    user.devices = []; // clear all
+    await user.save();
+
+    res.json({ message: "All devices removed", devices: user.devices });
+  } catch (err) {
+    console.error("Remove all devices error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ✅ Remove all other devices except current
+app.delete("/devices/remove-others/:deviceId", auth, async (req, res) => {
+  const { deviceId } = req.params;
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
     user.devices = user.devices.filter(d => d.deviceId === deviceId);
     await user.save();
 
@@ -290,7 +299,6 @@ app.delete("/devices/remove-others/:deviceId", auth, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
 
 // user sign up endpoint 
 
