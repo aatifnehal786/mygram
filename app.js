@@ -236,6 +236,65 @@ app.post("/verify-device-otp", async (req, res) => {
 });
 
 
+// get all devices 
+
+
+app.get("/get-devices", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("devices email username");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.status(200).json({ devices: user.devices });
+  } catch (err) {
+    console.error("Get devices error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+// remove device
+
+app.delete("/remove-device/:deviceId", verifiedToken, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+
+    // Remove device from user's devices list
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { $pull: { devices: { deviceId } } }
+    );
+
+    res.status(200).json({ message: "Device removed successfully" });
+  } catch (err) {
+    console.error("Remove device error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+// remove other devices except the current one
+
+// Remove all devices except current one
+app.delete("/remove-other-devices/:deviceId", verifiedToken, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Keep only the current device
+    user.devices = user.devices.filter((d) => d.deviceId === deviceId);
+    await user.save();
+
+    res.status(200).json({ message: "Logged out from all other devices" });
+  } catch (err) {
+    console.error("Remove other devices error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+
 
 // user sign up endpoint 
 
