@@ -27,7 +27,8 @@ const {Server} = require('socket.io');
 const {createServer} = require('http');
 const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 4000;
-const useragent = require('useragent')
+const useragent = require('express-useragent');
+app.use(useragent.express());
  
 // Serve uploaded images statically
 // app.use('/uploads', express.static('uploads'));
@@ -87,9 +88,8 @@ app.post("/login", async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Incorrect password" });
 
-    // Parse User-Agent
-    const agent = useragent.parse(req.headers["user-agent"]);
-   
+ 
+     const ua = req.useragent;
 
     // Check if device exists
     const existingDevice = user.devices.find(d => d.deviceId === deviceId);
@@ -136,7 +136,7 @@ app.post("/login", async (req, res) => {
 user.devices.push({
       deviceId: deviceId, // use frontend deviceId
       ip: ipAddress,
-      userAgent: req.headers["user-agent"],
+      userAgent: ua.source,
       authorized: false,
       addedAt: new Date(),
       lastUsed: new Date(),
@@ -186,9 +186,7 @@ app.post("/verify-device-otp", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Parse user-agent
-    const agent = useragent.parse(req.headers["user-agent"]);
-    const userAgentStr = agent.toString();
+    const ua = req.useragent
 
     // ✅ Check if device already exists
     const existingDevice = user.devices.find(d => d.deviceId === deviceId);
@@ -202,7 +200,7 @@ app.post("/verify-device-otp", async (req, res) => {
       user.devices.push({
         deviceId,
         ip: req.ip,
-        userAgent: userAgentStr,
+        userAgent: ua.source,
         authorized: true,
         addedAt: new Date(),
       });
