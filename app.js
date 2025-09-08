@@ -268,21 +268,7 @@ app.delete("/devices/:deviceId", auth, async (req, res) => {
 });
 
 
-// Remove all devices
-app.delete("/devices/remove-all", auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ message: "User not found" });
 
-    user.devices = []; // clear all
-    await user.save();
-
-    res.json({ message: "All devices removed", devices: [] });
-  } catch (err) {
-    console.error("Remove all devices error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
 
 // Remove all other devices except current
 app.delete("/devices/remove-others/:currentDeviceId", auth, async (req, res) => {
