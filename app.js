@@ -68,48 +68,6 @@ const transporter = nodemailer.createTransport({
 const otpStorage = {};
 
 
-// user sign up endpoint 
-
-app.post("/signup",async (req,res)=>{
-
-    let { username, email, password, mobile } = req.body;
-    const olduser = await User.findOne({ email: email });
-    if (olduser) return res.status(403).send({ message: "User already registered" });
-
-    const oldUsername = await User.findOne({username:username})
-    if(oldUsername) return res.status(403).json({message:"Choose Different Username, Username already exists"})
-    
-
-     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({ message: "Invalid email format" });
-  }
-    const passwordRegex =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-  if (!passwordRegex.test(password)) {
-    return res.status(401).json({
-      message:
-        "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
-    });
-  }
-
-    try {
-        const salt = await bcrypt.genSalt(10);
-        password = await bcrypt.hash(password, salt);
-        const user = await User.create({ username, email, password, mobile });
-        res.status(201).send({ user, message: "User registered" });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Some problem" });
-    }
-})
-
-
-
-
-
-
-
 // helper: send OTP
 async function sendOtpEmail(email, otp) {
   await transporter.sendMail({
@@ -211,8 +169,8 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// 
 
+// VERIFICATION FOR DEVICE
 
 
 
@@ -276,6 +234,55 @@ app.post("/verify-device-otp", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+
+
+// user sign up endpoint 
+
+app.post("/signup",async (req,res)=>{
+
+    let { username, email, password, mobile } = req.body;
+    const olduser = await User.findOne({ email: email });
+    if (olduser) return res.status(403).send({ message: "User already registered" });
+
+    const oldUsername = await User.findOne({username:username})
+    if(oldUsername) return res.status(403).json({message:"Choose Different Username, Username already exists"})
+    
+
+     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+    const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(password)) {
+    return res.status(401).json({
+      message:
+        "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+    });
+  }
+
+    try {
+        const salt = await bcrypt.genSalt(10);
+        password = await bcrypt.hash(password, salt);
+        const user = await User.create({ username, email, password, mobile });
+        res.status(201).send({ user, message: "User registered" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Some problem" });
+    }
+})
+
+
+
+
+
+
+
+
+// 
+
+
 
 
  
