@@ -68,15 +68,7 @@ const transporter = nodemailer.createTransport({
 const otpStorage = {};
 
 
-// helper: send OTP
-async function sendOtpEmail(email, otp) {
-  await transporter.sendMail({
-    from: `"Instagram" <${process.env.MY_GMAIL}>`,
-    to: email,
-    subject: "Your OTP Code",
-    text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
-  });
-}
+
 
 app.post("/login", async (req, res) => {
   const { loginId, password, deviceId } = req.body;
@@ -235,29 +227,29 @@ app.post("/verify-device-otp", async (req, res) => {
   }
 });
 
-
-// get all devices 
-// ✅ Get all devices
+// Get all devices
 app.get("/devices", auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select("devices");
     if (!user) return res.status(404).json({ message: "User not found" });
 
     res.json({ devices: user.devices });
   } catch (err) {
-    console.error("Get devices error:", err);
+    console.error("Fetch devices error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// ✅ Remove a single device
+// Remove one device
 app.delete("/devices/:deviceId", auth, async (req, res) => {
-  const { deviceId } = req.params;
+   const { deviceId } = req.params;
+
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    user.devices = user.devices.filter(d => d.deviceId !== deviceId);
+    // Filter out the target device
+    user.devices = user.devices.filter((d) => d.deviceId !== deviceId);
     await user.save();
 
     res.json({ message: "Device removed", devices: user.devices });
@@ -267,37 +259,42 @@ app.delete("/devices/:deviceId", auth, async (req, res) => {
   }
 });
 
-// ✅ Remove all devices (optionally keep current)
+// Remove all devices
 app.delete("/devices/remove-all", auth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
+
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.devices = []; // clear all
     await user.save();
 
-    res.json({ message: "All devices removed", devices: user.devices });
+    res.json({ message: "All devices removed", devices: [] });
   } catch (err) {
-    console.error("Remove all devices error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
-// ✅ Remove all other devices except current
-app.delete("/devices/remove-others/:deviceId", auth, async (req, res) => {
-  const { deviceId } = req.params;
+// Remove all other devices except current
+app.delete("/devices/remove-others/:currentDeviceId", auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+      const user = await User.findById(req.user._id);
+      if (!user) return res.status(404).json({ message: "User not found" });
 
-    user.devices = user.devices.filter(d => d.deviceId === deviceId);
-    await user.save();
+      // Keep only the current device
+      user.devices = user.devices.filter(
+        (d) => d.deviceId === currentDeviceId
+      );
+      await user.save();
 
-    res.json({ message: "Other devices removed", devices: user.devices });
-  } catch (err) {
-    console.error("Remove other devices error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
+      res.json({
+        message: "Removed all other devices",
+        devices: user.devices,
+      });
+    } catch (err) {
+      console.error("Remove other devices error:", err);
+      res.status(500).json({ message: "Server error" });
+    }
 });
 
 // user sign up endpoint 
