@@ -28,6 +28,7 @@ const {createServer} = require('http');
 const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 4000;
 const useragent = require('useragent')
+ const { v4: uuidv4 } = require("uuid");
 // Serve uploaded images statically
 // app.use('/uploads', express.static('uploads'));
 console.log("SID:", process.env.TWILIO_SID);
@@ -130,13 +131,16 @@ app.post("/login", async (req, res) => {
       }
     } else {
       // ⚡ New device → add device with authorized: false and send OTP
-      user.devices.push({
-        deviceId,
-        ip: ipAddress,
-        userAgent: userAgentStr,
-        authorized: false,
-        addedAt: new Date(),
-      });
+     
+
+user.devices.push({
+  deviceId: uuidv4(),
+  ip: req.ip,
+  userAgent: req.headers["user-agent"],
+  authorized: false,
+  addedAt: new Date(),
+});
+
       await user.save();
 
       const otp = crypto.randomInt(100000, 999999).toString();
@@ -241,16 +245,21 @@ app.get("/devices", auth, async (req, res) => {
 });
 
 // Remove one device
+// Remove one device
 app.delete("/devices/:deviceId", auth, async (req, res) => {
-   const { deviceId } = req.params;
-
   try {
+    const { deviceId } = req.params;
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Filter out the target device
-    user.devices = user.devices.filter((d) => d.deviceId !== deviceId);
-    await user.save();
+    const originalLength = user.devices.length;
+    user.devices = user.devices.filter(d => d.deviceId !== deviceId);
+
+    if (user.devices.length === originalLength) {
+      return res.status(404).json({ message: "Device not found" });
+    }
+
+    await user.save(); // ⚡ important: saves the updated array
 
     res.json({ message: "Device removed", devices: user.devices });
   } catch (err) {
@@ -259,11 +268,11 @@ app.delete("/devices/:deviceId", auth, async (req, res) => {
   }
 });
 
+
 // Remove all devices
 app.delete("/devices/remove-all", auth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
-
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.devices = []; // clear all
@@ -271,31 +280,29 @@ app.delete("/devices/remove-all", auth, async (req, res) => {
 
     res.json({ message: "All devices removed", devices: [] });
   } catch (err) {
-    res.status(500).json({ message: "Server error", error: err.message });
+    console.error("Remove all devices error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 // Remove all other devices except current
 app.delete("/devices/remove-others/:currentDeviceId", auth, async (req, res) => {
   try {
-      const user = await User.findById(req.user._id);
-      if (!user) return res.status(404).json({ message: "User not found" });
+    const { currentDeviceId } = req.params;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    
 
-      // Keep only the current device
-      user.devices = user.devices.filter(
-        (d) => d.deviceId === currentDeviceId
-      );
-      await user.save();
+    user.devices = user.devices.filter(d => d.deviceId === currentDeviceId);
+    await user.save();
 
-      res.json({
-        message: "Removed all other devices",
-        devices: user.devices,
-      });
-    } catch (err) {
-      console.error("Remove other devices error:", err);
-      res.status(500).json({ message: "Server error" });
-    }
+    res.json({ message: "Removed all other devices", devices: user.devices });
+  } catch (err) {
+    console.error("Remove other devices error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 });
+
 
 // user sign up endpoint 
 
