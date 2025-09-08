@@ -89,7 +89,7 @@ app.post("/login", async (req, res) => {
 
     // Parse User-Agent
     const agent = useragent.parse(req.headers["user-agent"]);
-    const userAgentStr = agent.toString();
+   
 
     // Check if device exists
     const existingDevice = user.devices.find(d => d.deviceId === deviceId);
@@ -135,7 +135,7 @@ app.post("/login", async (req, res) => {
 
 user.devices.push({
       deviceId: deviceId, // use frontend deviceId
-      ip: req.ip,
+      ip: ipAddress,
       userAgent: req.headers["user-agent"],
       authorized: false,
       addedAt: new Date(),
